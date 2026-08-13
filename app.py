@@ -3,9 +3,51 @@ from datetime import date, timedelta
 import sqlite3
 import uuid
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
+
+# 自訂 CSS 打造靚仔月曆網格
+st.markdown(
+    """
+    <style>
+    .calendar-header {
+        font-weight: bold;
+        text-align: center;
+        background-color: #f1f5f9;
+        padding: 8px;
+        border-radius: 6px;
+        color: #334155;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+    .calendar-box {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 150px;
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        margin-bottom: 10px;
+    }
+    .calendar-box-empty {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 150px;
+        background-color: #f8fafc;
+        opacity: 0.3;
+        margin-bottom: 10px;
+    }
+    .day-num {
+        font-size: 14px;
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 6px;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
 
 
 # --- 初始化 SQLite 資料庫 ---
@@ -135,31 +177,11 @@ def delete_schedule_db(item_id):
 
 # 顏色對應樣式配置
 color_styles = {
-    "粉紅": (
-        "background-color: #fce7f3; color: #9d174d; border: 1px solid"
-        " #fbcfe8;",
-        "#db2777",
-    ),
-    "藍色": (
-        "background-color: #eff6ff; color: #1e40af; border: 1px solid"
-        " #bfdbfe;",
-        "#3b82f6",
-    ),
-    "紫色": (
-        "background-color: #f3e8ff; color: #6b21a8; border: 1px solid"
-        " #e9d5ff;",
-        "#9333ea",
-    ),
-    "綠色": (
-        "background-color: #f0fdf4; color: #166534; border: 1px solid"
-        " #bbf7d0;",
-        "#16a34a",
-    ),
-    "黃色": (
-        "background-color: #fefce8; color: #854d0e; border: 1px solid"
-        " #fef08a;",
-        "#ca8a04",
-    ),
+    "粉紅": "background-color: #fce7f3; color: #9d174d; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fef08a;",
 }
 
 activities = get_activities()
@@ -259,14 +281,6 @@ with col_center:
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
-  # 檢查網址參數是否有刪除動作並即時處理
-  query_params = st.query_params
-  if "delete_item" in query_params:
-    del_id = query_params["delete_item"]
-    delete_schedule_db(del_id)
-    st.query_params.clear()
-    st.rerun()
-
   # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
@@ -294,67 +308,58 @@ with col_center:
 
   st.write("")
 
-  # 準備月曆 HTML 結構
+  # 顯示 7 列星期標題
+  week_days = ["日", "一", "二", "三", "四", "五", "六"]
+  header_cols = st.columns(7)
+  for i, day_name in enumerate(week_days):
+    header_cols[i].markdown(
+        f"<div class='calendar-header'>{day_name}</div>",
+        unsafe_allow_html=True,
+    )
+
+  # 取得該月月曆網格
   cal = calendar.Calendar(firstweekday=6)
   month_matrix = cal.monthdayscalendar(
       st.session_state.view_year, st.session_state.view_month
   )
 
-  week_days = ["日", "一", "二", "三", "四", "五", "六"]
-
-  calendar_html_parts = [
-      """
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: transparent; color: #1e293b; margin: 0; padding: 0; }
-        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-        .cal-header { font-weight: bold; text-align: center; background-color: #f1f5f9; padding: 8px; border-radius: 6px; color: #334155; font-size: 13px; }
-        .calendar-box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; min-height: 120px; background-color: #ffffff; display: flex; flex-direction: column; position: relative; box-sizing: border-box; }
-        .calendar-box-empty { border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; min-height: 120px; background-color: #f8fafc; opacity: 0.3; }
-        .day-num { font-size: 13px; font-weight: bold; color: #1e293b; margin-bottom: 4px; }
-        .event-card { position: relative; padding: 4px 20px 4px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 3px; line-height: 1.2; box-sizing: border-box; }
-        .event-delete-x { position: absolute; top: 2px; right: 4px; text-decoration: none; font-weight: bold; font-size: 11px; cursor: pointer; }
-        .event-delete-x:hover { opacity: 0.7; }
-    </style>
-    <div class="cal-grid">
-    """
-  ]
-
-  for d_name in week_days:
-    calendar_html_parts.append(f'<div class="cal-header">{d_name}</div>')
-
+  # 渲染月曆格子 (完全使用原生 Streamlit 排版，絕不產生頁中頁)
   for week in month_matrix:
-    for day in week:
-      if day == 0:
-        calendar_html_parts.append('<div class="calendar-box-empty"></div>')
-      else:
-        current_d = date(
-            st.session_state.view_year, st.session_state.view_month, day
-        )
-        day_events = schedule.get(current_d, [])
-
-        events_html = ""
-        for ev in day_events:
-          card_style, x_color = color_styles.get(
-              ev["color"], color_styles["藍色"]
+    cols = st.columns(7)
+    for i, day in enumerate(week):
+      with cols[i]:
+        if day == 0:
+          st.markdown(
+              "<div class='calendar-box-empty'></div>", unsafe_allow_html=True
           )
-          events_html += f"""
-                    <div class="event-card" style="{card_style}">
-                        <b>{ev['name']}</b><br>{ev['time']}
-                        <a href="?delete_item={ev['item_id']}" class="event-delete-x" style="color: {x_color};" title="刪除">✕</a>
-                    </div>
-                    """
+        else:
+          current_d = date(
+              st.session_state.view_year, st.session_state.view_month, day
+          )
+          day_events = schedule.get(current_d, [])
 
-        calendar_html_parts.append(
-            f"""
-                <div class="calendar-box">
-                    <div class="day-num">{day}</div>
-                    {events_html}
-                </div>
-                """
-        )
+          # 每個日期格子開頭
+          st.markdown(
+              f"<div class='calendar-box'><div"
+              f" class='day-num'>{day}</div>",
+              unsafe_allow_html=True,
+          )
 
-  calendar_html_parts.append("</div>")
-  full_calendar_html = "".join(calendar_html_parts)
+          # 渲染當日的活動項目及刪除按鈕
+          if day_events:
+            for ev in day_events:
+              style_str = color_styles.get(ev["color"], color_styles["藍色"])
+              # 用兩欄分開活動資訊與極簡刪除按鈕，確保整齊
+              c_ev, c_del = st.columns([4, 1])
+              with c_ev:
+                st.markdown(
+                    f"<div"
+                    f" style='{style_str}'><b>{ev['name']}</b><br>{ev['time']}</div>",
+                    unsafe_allow_html=True,
+                )
+              with c_del:
+                if st.button("✕", key=f"del_sch_{ev['item_id']}"):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
 
-  # 透過 components.v1.html 完美渲染成型，徹底解決源碼外露問題
-  components.html(full_calendar_html, height=750, scrolling=True)
+          st.markdown("</div>", unsafe_allow_html=True)
