@@ -6,50 +6,35 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：月曆格採用相對定位，刪除按鈕採用絕對定位浮喺右上角，左邊按鈕回復正常橫向
+# 自訂 CSS：將月曆格高度鎖定在 175px，確保多行活動時上下空間極之鬆動、靚仔
 st.markdown(
     """
     <style>
-    .calendar-box {
-        position: relative;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        background-color: #ffffff;
-        height: 180px;
-        padding: 10px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        margin-bottom: 10px;
-        overflow: hidden;
-    }
-    .calendar-box-empty {
-        border: none;
-        background-color: transparent;
-        height: 180px;
-    }
-    .day-number {
-        font-weight: bold;
-        color: #1e293b;
-        margin-bottom: 6px;
-        font-size: 15px;
-    }
-    .event-item {
-        font-size: 13px;
-        color: #334155;
-        background-color: #f8fafc;
-        padding: 4px 8px;
-        border-radius: 4px;
-        margin-bottom: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
+        min-height: 175px;
     }
     
-    /* 修正左邊欄按鈕變直行嘅問題 */
-    div.stButton > button {
-        width: 100% !important;
+    [data-testid="stContainer"] {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+    }
+    
+    /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
+    button[kind="secondary"] {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #ef4444 !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+        padding: 0px !important;
+        min-height: unset !important;
+        height: 24px !important;
+    }
+    button[kind="secondary"]:hover {
+        background-color: #fee2e2 !important;
+        color: #991b1b !important;
+        border-radius: 4px !important;
     }
     </style>
 """,
@@ -337,37 +322,34 @@ with col_center:
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          st.markdown(
-              "<div class='calendar-box-empty'></div>", unsafe_allow_html=True
-          )
+          with st.container(border=False):
+            st.write("")
         else:
           current_d = date(
               st.session_state.view_year, st.session_state.view_month, day
           )
           day_events = schedule.get(current_d, [])
 
-          # 組合該日所有活動的 HTML
-          events_html = f"<div class='day-number'>{day}</div>"
-          if day_events:
-            for ev in day_events:
-              emoji = color_emojis.get(ev["color"], "📌")
-              events_html += (
-                  f"<div"
-                  f" class='event-item'><span>{emoji}&nbsp;{ev['name']}&nbsp;({ev['time']})</span>"
+          with st.container(border=True):
+            st.markdown(f"**{day}**")
+
+            rendered_count = 0
+            if day_events:
+              for ev in day_events:
+                emoji = color_emojis.get(ev["color"], "📌")
+                c_txt, c_del = st.columns([6, 1])
+                with c_txt:
+                  st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+                with c_del:
+                  if st.button("✕", key=f"del_{ev['item_id']}"):
+                    delete_schedule_db(ev["item_id"])
+                    st.rerun()
+                rendered_count += 1
+
+            while rendered_count < 2:
+              st.caption(
+                  "<span"
+                  " style='opacity:0; user-select:none;'>-</span>",
+                  unsafe_allow_html=True,
               )
-              # 檢查有無對應刪除按鈕
-              events_html += "</div>"
-
-          st.markdown(
-              f"<div class='calendar-box'>{events_html}</div>",
-              unsafe_allow_html=True,
-          )
-
-          # 為了解決 Streamlit 按鈕排版問題，我們將刪除按鈕放在一個極精簡的下方區塊或用文字連結處理
-          if day_events:
-            for ev in day_events:
-              c_space, c_del_btn = st.columns([4, 1])
-              with c_del_btn:
-                if st.button("✕", key=f"del_{ev['item_id']}"):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
+              rendered_count += 1
