@@ -119,7 +119,7 @@ if not activities:
 
 schedule = get_schedule()
 
-st.title("👧 囡囡課外活動管理助手 (永久儲存版)")
+st.title("👧 囡囡課外活動管理助手")
 
 # --- 側邊欄：管理活動種類 ---
 with st.sidebar:
