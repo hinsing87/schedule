@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：雙月月曆格高度與樣式微調
+# 自訂 CSS：上下雙月月曆格高度與樣式微調
 st.markdown(
     """
     <style>
@@ -177,7 +177,7 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 版面配置：左邊設定，中間雙月大月曆 ---
+# --- 版面配置：左邊設定，中間上下雙月大月曆 ---
 col_left, col_center = st.columns([1, 3.2], gap="large")
 
 with col_left:
@@ -302,8 +302,8 @@ with col_center:
   # 渲染單個月份月曆的函式
   def render_month_calendar(year, month):
     st.markdown(
-        f"<h4 style='text-align: center; color: #334155; margin-bottom: 10px;'>"
-        f"{year} 年 {month} 月</h4>",
+        f"<h4 style='text-align: center; color: #334155; margin-top: 10px;"
+        f" margin-bottom: 8px;'>{year} 年 {month} 月</h4>",
         unsafe_allow_html=True,
     )
 
@@ -364,11 +364,7 @@ with col_center:
                 rendered_count += 1
 
 
-  # 左右並排顯示兩個月份
-  col_m1, col_m2 = st.columns(2, gap="medium")
-
-  with col_m1:
-    render_month_calendar(m1_year, m1_month)
-
-  with col_m2:
-    render_month_calendar(m2_year, m2_month)
+  # 上下上下排列顯示兩個月份
+  render_month_calendar(m1_year, m1_month)
+  st.divider()
+  render_month_calendar(m2_year, m2_month)
