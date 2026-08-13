@@ -6,19 +6,6 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：強制設定月曆格子預設高度，確保至少放到兩行活動
-st.markdown(
-    """
-    <style>
-    /* 調整 container 最小高度，確保夠位放至少兩行 */
-    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 140px;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -311,10 +298,11 @@ with col_center:
           with st.container(border=True):
             st.markdown(f"**{day}**")
 
+            # 確保每個格子至少渲染 2 行空間（即使冇活動或得一個活動，都用透明文字/空白撐高，令所有格仔高度一致）
+            rendered_count = 0
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                # 用 4:1 比例將活動文字與極簡「✕」按鈕迫在同一行
                 c_txt, c_del = st.columns([4, 1])
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
@@ -322,3 +310,13 @@ with col_center:
                   if st.button("✕", key=f"del_{ev['item_id']}"):
                     delete_schedule_db(ev["item_id"])
                     st.rerun()
+                rendered_count += 1
+
+            # 補夠 2 行的空間，確保所有日期格子高度完美對齊
+            while rendered_count < 2:
+              st.caption(
+                  "<span"
+                  " style='opacity:0; user-select:none;'>-</span>",
+                  unsafe_allow_html=True,
+              )
+              rendered_count += 1
