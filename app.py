@@ -6,6 +6,28 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
+# 自訂 CSS：將按鈕縮小、緊貼文字，並統一步調控制月曆格子高度
+st.markdown(
+    """
+    <style>
+    /* 統一個別月曆格子的最小高度，確保整齊 */
+    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
+        min-height: 110px;
+    }
+    /* 將刪除按鈕縮小並去除多餘留白 */
+    button[kind="secondary"] {
+        padding: 0px 4px !important;
+        min-height: 22px !important;
+        height: 22px !important;
+        font-size: 11px !important;
+        line-height: 1 !important;
+        border-radius: 4px !important;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -298,12 +320,12 @@ with col_center:
           with st.container(border=True):
             st.markdown(f"**{day}**")
 
-            # 確保每個格子至少渲染 2 行空間（即使冇活動或得一個活動，都用透明文字/空白撐高，令所有格仔高度一致）
             rendered_count = 0
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                c_txt, c_del = st.columns([4, 1])
+                # 用 5:1 比例讓刪除掣更小、更貼近文字
+                c_txt, c_del = st.columns([5, 1])
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
                 with c_del:
@@ -312,7 +334,7 @@ with col_center:
                     st.rerun()
                 rendered_count += 1
 
-            # 補夠 2 行的空間，確保所有日期格子高度完美對齊
+            # 確保高度統一
             while rendered_count < 2:
               st.caption(
                   "<span"
