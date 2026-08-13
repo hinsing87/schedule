@@ -6,26 +6,31 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：設定月曆格高，以及整走連結按鈕嘅底線同調整顏色
+# 自訂 CSS：將月曆格高加高，並將特定刪除按鈕偽裝成無邊框嘅紅色 X
 st.markdown(
     """
     <style>
-    /* 稍微加大月曆格子高度，保證兩行活動加空行時唔會逼夾 */
+    /* 略為加高月曆格子，確保兩行活動加佔位符時完美不擁擠 */
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 125px;
+        min-height: 135px;
     }
-    /* 自訂刪除連結樣式：無邊框、紅色、懸停變深紅 */
-    .del-link {
+    
+    /* 將用作刪除的按鈕變成無邊框、紅色、極細嘅文字按鈕樣式 */
+    button[key^="del_btn_"] {
+        background-color: transparent !important;
+        border: none !important;
         color: #ef4444 !important;
-        text-decoration: none !important;
-        font-weight: bold;
-        font-size: 13px;
-        padding: 0px 4px;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        padding: 0px !important;
+        min-height: unset !important;
+        height: auto !important;
+        box-shadow: none !important;
     }
-    .del-link:hover {
+    button[key^="del_btn_"]:hover {
         color: #991b1b !important;
-        background-color: #fee2e2;
-        border-radius: 4px;
+        background-color: #fee2e2 !important;
+        border-radius: 3px !important;
     }
     </style>
 """,
@@ -249,14 +254,6 @@ with col_left:
 with col_center:
   st.header("🗓️ 月曆總覽")
 
-  # 檢查網址參數是否有刪除指令（用來實現無邊框紅X點擊刪除）
-  query_params = st.query_params
-  if "del_item" in query_params:
-    item_to_del = query_params["del_item"]
-    delete_schedule_db(item_to_del)
-    st.query_params.clear()
-    st.rerun()
-
   # 處理 Session State 中的年月切換
   if "view_year" not in st.session_state:
     st.session_state.view_year = date.today().year
@@ -336,17 +333,14 @@ with col_center:
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                # 用 6:1 比例確保紅X完美貼在同一行右側，無邊框極靚仔
                 c_txt, c_del = st.columns([6, 1])
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
                 with c_del:
-                  st.markdown(
-                      f"<div style='text-align: right;'><a"
-                      f" href='?del_item={ev['item_id']}'"
-                      " class='del-link'>✕</a></div>",
-                      unsafe_allow_html=True,
-                  )
+                  # 使用原生 button 配搭 CSS key 前綴，做到無邊框紅色 X 且留在原頁
+                  if st.button("✕", key=f"del_btn_{ev['item_id']}"):
+                    delete_schedule_db(ev["item_id"])
+                    st.rerun()
                 rendered_count += 1
 
             while rendered_count < 2:
