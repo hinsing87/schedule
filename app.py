@@ -327,11 +327,12 @@ with col_center:
 
   # 連續渲染 10 個星期（每星期一行，共 10 行）
   for w in range(10):
-    # 改用每週的「星期三」（index 3）作為該週所屬月份嘅判斷依據（因為星期三一定係該週嘅核心月份）
-    week_wednesday = st.session_state.start_week_date + timedelta(
-        days=(w * 7) + 3
+    # 統計該週 7 日入面，邊個月份佔嘅日子最多（或者以該週星期四所屬嘅月份作準，最符合會計/日曆慣例）
+    week_thursday = st.session_state.start_week_date + timedelta(
+        days=(w * 7) + 4
     )
-    current_month = week_wednesday.month
+    current_month = week_thursday.month
+    current_year = week_thursday.year
 
     # 如果跨咗新月份，自動加一個優雅嘅月份分隔標題
     if last_month is not None and current_month != last_month:
@@ -339,7 +340,7 @@ with col_center:
           f"<div style='text-align: center; font-weight: bold; color:"
           f" #0284c7; background-color: #f0f9ff; padding: 4px; border-radius:"
           f" 4px; margin: 12px 0 8px 0; font-size: 13px;'>── 🌸"
-          f" {week_wednesday.year} 年 {current_month} 月 ──</div>",
+          f" {current_year} 年 {current_month} 月 ──</div>",
           unsafe_allow_html=True,
       )
     last_month = current_month
