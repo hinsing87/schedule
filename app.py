@@ -6,22 +6,26 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：將按鈕縮小、緊貼文字，並統一步調控制月曆格子高度
+# 自訂 CSS：設定月曆格高，以及整走連結按鈕嘅底線同調整顏色
 st.markdown(
     """
     <style>
-    /* 統一個別月曆格子的最小高度，確保整齊 */
+    /* 稍微加大月曆格子高度，保證兩行活動加空行時唔會逼夾 */
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 110px;
+        min-height: 125px;
     }
-    /* 將刪除按鈕縮小並去除多餘留白 */
-    button[kind="secondary"] {
-        padding: 0px 4px !important;
-        min-height: 22px !important;
-        height: 22px !important;
-        font-size: 11px !important;
-        line-height: 1 !important;
-        border-radius: 4px !important;
+    /* 自訂刪除連結樣式：無邊框、紅色、懸停變深紅 */
+    .del-link {
+        color: #ef4444 !important;
+        text-decoration: none !important;
+        font-weight: bold;
+        font-size: 13px;
+        padding: 0px 4px;
+    }
+    .del-link:hover {
+        color: #991b1b !important;
+        background-color: #fee2e2;
+        border-radius: 4px;
     }
     </style>
 """,
@@ -170,7 +174,7 @@ col_left, col_center = st.columns([1, 2.8], gap="large")
 with col_left:
   st.header("⚙️ 活動設定與排程")
 
-  # 1. 將活動安排到指定日期 (移到最上方)
+  # 1. 將活動安排到指定日期
   st.subheader("📌 安排活動到日期")
   if activities:
     sel_date = st.date_input("選擇日期", value=date.today())
@@ -186,7 +190,7 @@ with col_left:
     chosen_info = activities[selected_act_id]
 
     c_btn1, c_btn2 = st.columns(2)
-    if c_btn1.button("📅 單次新增"):
+    if c_btn1.button("📅 單次新增", use_container_width=True):
       item_id = str(uuid.uuid4())[:8]
       add_schedule_db(
           item_id,
@@ -199,7 +203,7 @@ with col_left:
       st.success("成功安排！")
       st.rerun()
 
-    if c_btn2.button("🔄 重複加未來4週"):
+    if c_btn2.button("🔄 重複加4週", use_container_width=True):
       for i in range(4):
         target_date = sel_date + timedelta(weeks=i)
         item_id = str(uuid.uuid4())[:8]
@@ -244,6 +248,14 @@ with col_left:
 
 with col_center:
   st.header("🗓️ 月曆總覽")
+
+  # 檢查網址參數是否有刪除指令（用來實現無邊框紅X點擊刪除）
+  query_params = st.query_params
+  if "del_item" in query_params:
+    item_to_del = query_params["del_item"]
+    delete_schedule_db(item_to_del)
+    st.query_params.clear()
+    st.rerun()
 
   # 處理 Session State 中的年月切換
   if "view_year" not in st.session_state:
@@ -324,13 +336,17 @@ with col_center:
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                c_txt, c_del = st.columns([5, 1])
+                # 用 6:1 比例確保紅X完美貼在同一行右側，無邊框極靚仔
+                c_txt, c_del = st.columns([6, 1])
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
                 with c_del:
-                  if st.button("✕", key=f"del_{ev['item_id']}"):
-                    delete_schedule_db(ev["item_id"])
-                    st.rerun()
+                  st.markdown(
+                      f"<div style='text-align: right;'><a"
+                      f" href='?del_item={ev['item_id']}'"
+                      " class='del-link'>✕</a></div>",
+                      unsafe_allow_html=True,
+                  )
                 rendered_count += 1
 
             while rendered_count < 2:
