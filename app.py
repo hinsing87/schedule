@@ -6,42 +6,32 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS 令月曆格子更加靚仔清晰
+# 自訂 CSS 打造傳統月曆網格與靚仔顏色標籤
 st.markdown(
     """
     <style>
     .calendar-box {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 8px;
-        min-height: 110px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px;
+        min-height: 130px;
         background-color: #ffffff;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     .calendar-header {
         font-weight: bold;
         text-align: center;
-        background-color: #f8f9fa;
-        padding: 6px;
-        border-radius: 4px;
-        margin-bottom: 6px;
+        background-color: #f1f5f9;
+        padding: 8px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        color: #334155;
     }
     .day-num {
-        font-size: 14px;
+        font-size: 15px;
         font-weight: bold;
-        color: #333333;
-    }
-    .event-tag {
-        font-size: 11px;
-        background-color: #e8f0fe;
-        color: #1a73e8;
-        padding: 2px 4px;
-        border-radius: 4px;
-        margin-top: 2px;
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        color: #1e293b;
     }
     </style>
 """,
@@ -58,7 +48,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS activities (
             act_id TEXT PRIMARY KEY,
             name TEXT,
-            time TEXT
+            time TEXT,
+            color TEXT
         )
     """
   )
@@ -69,7 +60,8 @@ def init_db():
             act_id TEXT,
             date TEXT,
             name TEXT,
-            time TEXT
+            time TEXT,
+            color TEXT
         )
     """
   )
@@ -83,18 +75,32 @@ init_db()
 def get_activities():
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
-  c.execute("SELECT act_id, name, time FROM activities")
+  # 兼容舊資料庫欄位
+  try:
+    c.execute("SELECT act_id, name, time, color FROM activities")
+  except sqlite3.OperationalError:
+    c.execute("ALTER TABLE activities ADD COLUMN color TEXT")
+    conn.commit()
+    c.execute("SELECT act_id, name, time, color FROM activities")
   rows = c.fetchall()
   conn.close()
-  return {row[0]: {"name": row[1], "time": row[2]} for row in rows}
+  return {
+      row[0]: {
+          "name": row[1],
+          "time": row[2],
+          "color": row[3] if row[3] else "藍色",
+      }
+      for row in rows
+  }
 
 
-def add_activity_db(act_id, name, time):
+def add_activity_db(act_id, name, time, color):
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
   c.execute(
-      "INSERT OR REPLACE INTO activities (act_id, name, time) VALUES (?, ?, ?)",
-      (act_id, name, time),
+      "INSERT OR REPLACE INTO activities (act_id, name, time, color) VALUES"
+      " (?, ?, ?, ?)",
+      (act_id, name, time, color),
   )
   conn.commit()
   conn.close()
@@ -112,29 +118,40 @@ def delete_activity_db(act_id):
 def get_schedule():
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
-  c.execute("SELECT item_id, act_id, date, name, time FROM schedule")
+  try:
+    c.execute("SELECT item_id, act_id, date, name, time, color FROM schedule")
+  except sqlite3.OperationalError:
+    c.execute("ALTER TABLE schedule ADD COLUMN color TEXT")
+    conn.commit()
+    c.execute("SELECT item_id, act_id, date, name, time, color FROM schedule")
   rows = c.fetchall()
   conn.close()
 
   sched = {}
   for row in rows:
-    item_id, act_id, d_str, name, time = row
+    item_id, act_id, d_str, name, time, color = row
     d = date.fromisoformat(d_str)
     if d not in sched:
       sched[d] = []
     sched[d].append(
-        {"item_id": item_id, "act_id": act_id, "name": name, "time": time}
+        {
+            "item_id": item_id,
+            "act_id": act_id,
+            "name": name,
+            "time": time,
+            "color": color if color else "藍色",
+        }
     )
   return sched
 
 
-def add_schedule_db(item_id, act_id, d_str, name, time):
+def add_schedule_db(item_id, act_id, d_str, name, time, color):
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
   c.execute(
-      "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time)"
-      " VALUES (?, ?, ?, ?, ?)",
-      (item_id, act_id, d_str, name, time),
+      "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
+      " color) VALUES (?, ?, ?, ?, ?, ?)",
+      (item_id, act_id, d_str, name, time, color),
   )
   conn.commit()
   conn.close()
@@ -148,52 +165,63 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
+# 顏色對應的 CSS 樣式
+color_map = {
+    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a;",
+}
+
 activities = get_activities()
 if not activities:
-  default_id1 = str(uuid.uuid4())[:8]
-  default_id2 = str(uuid.uuid4())[:8]
-  add_activity_db(default_id1, "鋼琴班", "16:00")
-  add_activity_db(default_id2, "游泳班", "10:00")
+  add_activity_db(str(uuid.uuid4())[:8], "鋼琴班", "16:00", "粉紅")
+  add_activity_db(str(uuid.uuid4())[:8], "游泳班", "10:00", "藍色")
   activities = get_activities()
 
 schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 側邊欄：管理活動種類 ---
-with st.sidebar:
-  st.header("⚙️ 設定活動種類")
-  act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
-  act_time = st.text_input("時間 (例如: 16:00)")
-  if st.button("＋ 新增活動種類"):
-    if act_name:
-      new_id = str(uuid.uuid4())[:8]
-      add_activity_db(new_id, act_name, act_time)
-      st.rerun()
+# --- 版面配置：左邊設定活動，中間主力放大月曆 ---
+col_left, col_center = st.columns([1, 2.5], gap="large")
 
-  st.divider()
+with col_left:
+  st.header("⚙️ 活動設定與排程")
+
+  # 1. 新增活動種類
+  with st.expander("＋ 新增活動種類", expanded=True):
+    act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
+    act_time = st.text_input("時間 (例如: 16:00)")
+    act_color = st.selectbox(
+        "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
+    )
+    if st.button("確認新增活動"):
+      if act_name:
+        new_id = str(uuid.uuid4())[:8]
+        add_activity_db(new_id, act_name, act_time, act_color)
+        st.success(f"已新增: {act_name}")
+        st.rerun()
+
+  # 2. 現有活動庫管理
   st.subheader("📋 現有活動庫")
   if not activities:
-    st.write("暫時未有活動，請在上方新增。")
+    st.write("暫時未有活動。")
   else:
     for act_id, info in list(activities.items()):
-      c1, c2 = st.columns([3, 1])
-      c1.write(f"**{info['name']}** ({info['time']})")
-      if c2.button("🗑️", key=f"del_act_{act_id}"):
+      c_a, c_b = st.columns([3, 1])
+      c_a.write(f"**{info['name']}** ({info['time']})")
+      if c_b.button("🗑️", key=f"del_act_{act_id}"):
         delete_activity_db(act_id)
         st.rerun()
 
-# --- 主區域：左邊排程，右邊傳統月曆 ---
-col_form, col_calendar = st.columns([1, 2], gap="large")
+  st.divider()
 
-with col_form:
-  st.subheader("📌 將活動安排到指定日期")
-
-  if not activities:
-    st.warning("請先在左側新增至少一個活動！")
-  else:
-    sel_date = st.date_input("選擇起始日期", value=date.today())
-
+  # 3. 將活動安排到指定日期
+  st.subheader("📌 安排活動到日期")
+  if activities:
+    sel_date = st.date_input("選擇日期", value=date.today())
     act_options = {
         act_id: f"{info['name']} ({info['time']})"
         for act_id, info in activities.items()
@@ -203,11 +231,9 @@ with col_form:
         options=list(act_options.keys()),
         format_func=lambda x: act_options[x],
     )
-
     chosen_info = activities[selected_act_id]
 
     c_btn1, c_btn2 = st.columns(2)
-
     if c_btn1.button("📅 單次新增"):
       item_id = str(uuid.uuid4())[:8]
       add_schedule_db(
@@ -216,8 +242,9 @@ with col_form:
           sel_date.isoformat(),
           chosen_info["name"],
           chosen_info["time"],
+          chosen_info["color"],
       )
-      st.success(f"成功安排 {chosen_info['name']} 於 {sel_date}！")
+      st.success("成功安排！")
       st.rerun()
 
     if c_btn2.button("🔄 重複加未來4週"):
@@ -230,33 +257,48 @@ with col_form:
             target_date.isoformat(),
             chosen_info["name"],
             chosen_info["time"],
+            chosen_info["color"],
         )
-      st.success("已成功添加未來 4 週日程！")
+      st.success("成功新增未來4週！")
       st.rerun()
 
-  st.divider()
-  st.subheader("🗑️ 管理與刪除已排行程")
-  # 快速管理當日行程清單
-  manage_date = st.date_input("選擇要查看/刪除行程的日子", value=date.today())
-  if manage_date in schedule and schedule[manage_date]:
-    for item in schedule[manage_date]:
-      c_a, c_b = st.columns([3, 1])
-      c_a.write(f"• **{item['name']}** ({item['time']})")
-      if c_b.button("刪除", key=f"manage_del_{item['item_id']}"):
-        delete_schedule_db(item["item_id"])
-        st.rerun()
-  else:
-    st.info("這天暫時沒有活動。")
+with col_center:
+  st.header("🗓️ 月曆總覽")
 
-with col_calendar:
-  st.subheader("🗓️ 傳統月曆檢視")
+  # 處理 Session State 中的年月切換（透過箭咀按鈕）
+  if "view_year" not in st.session_state:
+    st.session_state.view_year = date.today().year
+  if "view_month" not in st.session_state:
+    st.session_state.view_month = date.today().month
 
-  # 選擇要查看嘅年份同月份
-  col_y, col_m = st.columns(2)
-  view_year = col_y.selectbox("選擇年份", [2025, 2026, 2027], index=1)
-  view_month = col_m.selectbox("選擇月份", range(1, 13), index=date.today().month - 1 if view_year == date.today().year else 0)
+  # 月份切換控制列（箭咀與標題）
+  c_prev, c_title, c_next = st.columns([1, 4, 1])
 
-  # 建立 7 列星期標題 (星期日開始)
+  if c_prev.button("◀ 上個月", use_container_width=True):
+    if st.session_state.view_month == 1:
+      st.session_state.view_month = 12
+      st.session_state.view_year -= 1
+    else:
+      st.session_state.view_month -= 1
+    st.rerun()
+
+  c_title.markdown(
+      f"<h3 style='text-align: center; margin: 0; color: #1e293b;'>"
+      f"{st.session_state.view_year} 年 {st.session_state.view_month} 月</h3>",
+      unsafe_allow_html=True,
+  )
+
+  if c_next.button("下個月 ▶", use_container_width=True):
+    if st.session_state.view_month == 12:
+      st.session_state.view_month = 1
+      st.session_state.view_year += 1
+    else:
+      st.session_state.view_month += 1
+    st.rerun()
+
+  st.write("")  # 隔開少許空間
+
+  # 顯示 7 列星期標題
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
   header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
@@ -265,34 +307,39 @@ with col_calendar:
         unsafe_allow_html=True,
     )
 
-  # 取得該月嘅月曆網格 (以星期日為第一日: firstweekday=6)
+  # 取得該月月曆網格
   cal = calendar.Calendar(firstweekday=6)
-  month_matrix = cal.monthdayscalendar(view_year, view_month)
+  month_matrix = cal.monthdayscalendar(
+      st.session_state.view_year, st.session_state.view_month
+  )
 
-  # 繪製月曆格子
+  # 渲染月曆格子
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          # 非本月日子，留空
           st.markdown(
-              "<div class='calendar-box' style='background-color: #f9f9f9;"
-              " opacity: 0.4;'></div>",
+              "<div class='calendar-box' style='background-color: #f8fafc;"
+              " opacity: 0.3;'></div>",
               unsafe_allow_html=True,
           )
         else:
-          current_d = date(view_year, view_month, day)
+          current_d = date(
+              st.session_state.view_year, st.session_state.view_month, day
+          )
           day_events = schedule.get(current_d, [])
 
-          # 組合該日的活動標籤
+          # 組合該日的活動標籤與直接刪除按鈕
           events_html = ""
           for ev in day_events:
-            events_html += (
-                f"<span class='event-tag'>📌 {ev['name']} ({ev['time']})</span>"
-            )
+            c_style = color_map.get(ev["color"], color_map["藍色"])
+            events_html += f"""
+                        <div style='{c_style}; font-size: 11px; padding: 3px 6px; border-radius: 6px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;'>
+                            <span><b>{ev['name']}</b> ({ev['time']})</span>
+                        </div>
+                        """
 
-          # 渲染單個日子嘅方格
           st.markdown(
               f"""
                     <div class='calendar-box'>
@@ -302,3 +349,14 @@ with col_calendar:
                     """,
               unsafe_allow_html=True,
           )
+
+          # 直接在月曆格子下方為每個活動提供刪除按鈕
+          if day_events:
+            for ev in day_events:
+              if st.button(
+                  f"❌ {ev['name']} ({ev['time']})",
+                  key=f"cal_del_{ev['item_id']}",
+                  use_container_width=True,
+              ):
+                delete_schedule_db(ev["item_id"])
+                st.rerun()
