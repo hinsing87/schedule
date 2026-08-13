@@ -1,16 +1,15 @@
 from datetime import datetime, date
 import streamlit as st
-import pandas as pd
 
 # 設定網頁標題與佈局
 st.set_page_config(
     page_title="囡囡課外活動時間表", page_icon="📅", layout="wide"
 )
 
-st.title("👧 囡囡課外活動管理助手 (Python App)")
+st.title("👧 囡囡課外活動管理助手")
 st.write("輕鬆設定課外活動，並指派到指定日期，隨時查看每日上堂時間！")
 
-# 初始化 Session State (用黎記住新增既活動同時間表)
+# 初始化 Session State
 if "activities" not in st.session_state:
   st.session_state.activities = {
       "鋼琴班": "16:00 - 17:00",
@@ -20,7 +19,6 @@ if "activities" not in st.session_state:
   }
 
 if "schedule" not in st.session_state:
-  # 預設 2026年8月15日 有鋼琴班
   st.session_state.schedule = {date(2026, 8, 15): [("鋼琴班", "16:00 - 17:00")]}
 
 # --- 側邊欄：設定與新增活動 ---
@@ -62,7 +60,6 @@ with col1:
       if selected_date not in st.session_state.schedule:
         st.session_state.schedule[selected_date] = []
 
-      # 避免重複加入同一堂
       item = (chosen_activity, time_slot)
       if item not in st.session_state.schedule[selected_date]:
         st.session_state.schedule[selected_date].append(item)
@@ -100,19 +97,19 @@ with col2:
 
 st.divider()
 
-# --- 總覽清單 ---
+# --- 總覽清單 (純 Python 實現，唔需 Pandas) ---
 st.subheader("📚 所有已編排的日程總覽")
 if st.session_state.schedule:
-  all_data = []
-  for d, acts in st.session_state.schedule.items():
-    for act_name, act_time in acts:
-      all_data.append(
+  # 整理成表格數據
+  table_data = []
+  # 按日期排序
+  sorted_dates = sorted(st.session_state.schedule.keys())
+  for d in sorted_dates:
+    for act_name, act_time in st.session_state.schedule[d]:
+      table_data.append(
           {"日期": d.strftime("%Y-%m-%d"), "活動名稱": act_name, "上堂時間": act_time}
       )
 
-  df = pd.DataFrame(all_data)
-  # 排序
-  df = df.sort_values(by="日期")
-  st.dataframe(df, use_container_width=True, hide_index=True)
+  st.table(table_data)
 else:
   st.write("暫時未有任何日程紀錄。")
