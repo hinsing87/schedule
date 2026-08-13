@@ -4,13 +4,22 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 初始化 Session State
+# --- 初始化與資料修復機制 ---
 if "activities" not in st.session_state:
-  # 結構改為用 ID 做 key，或者用 List 儲存詳細資訊
   st.session_state.activities = {
       "1": {"name": "鋼琴班", "time": "16:00"},
       "2": {"name": "游泳班", "time": "10:00"},
   }
+else:
+  # 自動防呆：如果舊 session 裡面有純字串格式嘅活動，自動幫它升級成字典格式
+  fixed_activities = {}
+  for k, v in st.session_state.activities.items():
+    if isinstance(v, str):
+      fixed_activities[k] = {"name": v, "time": "15:00"}
+    else:
+      fixed_activities[k] = v
+  st.session_state.activities = fixed_activities
+
 if "schedule" not in st.session_state:
   st.session_state.schedule = {}
 
@@ -23,7 +32,7 @@ with st.sidebar:
   act_time = st.text_input("時間 (例如: 16:00)")
   if st.button("＋ 新增活動種類"):
     if act_name:
-      new_id = str(uuid.uuid4())[:8]  # 產生唯一 ID
+      new_id = str(uuid.uuid4())[:8]
       st.session_state.activities[new_id] = {"name": act_name, "time": act_time}
       st.rerun()
 
@@ -59,7 +68,6 @@ with col1:
   else:
     sel_date = st.date_input("選擇起始日期", value=date.today())
 
-    # 下拉選單顯示名稱與時間，確保容易辨識
     act_options = {
         act_id: f"{info['name']} ({info['time']})"
         for act_id, info in st.session_state.activities.items()
@@ -78,7 +86,6 @@ with col1:
       if sel_date not in st.session_state.schedule:
         st.session_state.schedule[sel_date] = []
 
-      # 每次加入都帶有獨一無二既 item_id，確保同名不同時間唔會互相覆蓋
       item = {
           "item_id": str(uuid.uuid4())[:8],
           "act_id": selected_act_id,
@@ -121,7 +128,6 @@ with col2:
             cols = st.columns([3, 1])
             cols[0].markdown(f"**{item['name']}** — ⏰ `{item['time']}`")
 
-            # 透過獨一無二既 item_id 進行刪除，精準安全
             if cols[1].button("🗑️ 刪除", key=f"del_item_{item['item_id']}"):
               st.session_state.schedule[d].pop(idx)
               if not st.session_state.schedule[d]:
