@@ -171,7 +171,7 @@ if not activities:
 
 schedule = get_schedule()
 
-st.title("👧 囡囡課外活動管理助手")
+st.title("👧 Narisa課外活動管理助手")
 
 # --- 版面配置：左邊設定，中間大月曆 ---
 col_left, col_center = st.columns([1, 2.8], gap="large")
