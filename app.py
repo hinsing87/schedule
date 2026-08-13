@@ -6,10 +6,29 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：手機響應式優化
+# 自訂 CSS：為手機提供流暢嘅橫向滾動支援、固定卡片高度與完美刪除按鈕
 st.markdown(
     """
     <style>
+    /* 手機響應式：令日曆外圍支援橫向滾動，唔會被強制壓縮變形 */
+    .calendar-scroll-container {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+    .calendar-table-wrapper {
+        min-width: 750px; /* 確保喺手機橫向滾動時保持正常闊度，唔會迫扁 */
+    }
+
+    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
+        min-height: 150px;
+    }
+    
+    [data-testid="stContainer"] {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
+    }
+    
     /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
     button[kind="secondary"] {
         background-color: transparent !important;
@@ -167,8 +186,8 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 版面配置：手機優先，自動堆疊 ---
-col_left, col_center = st.columns([1, 2], gap="large")
+# --- 版面配置：左邊設定，中間月曆檢視 ---
+col_left, col_center = st.columns([1, 3.2], gap="large")
 
 with col_left:
   st.header("⚙️ 活動設定與排程")
@@ -270,9 +289,9 @@ with col_center:
     st.session_state.start_week_date = current_sunday
 
   # 導航控制列
-  c_prev, c_title, c_next = st.columns([1, 3, 1])
+  c_prev, c_title, c_next = st.columns([1, 4, 1])
 
-  if c_prev.button("◀ 上週", use_container_width=True):
+  if c_prev.button("◀ 上一星期", use_container_width=True):
     st.session_state.start_week_date -= timedelta(weeks=1)
     st.rerun()
 
@@ -280,14 +299,14 @@ with col_center:
       days = (10 * 7) - 1
   )
   c_title.markdown(
-      f"<div style='text-align: center; font-weight: bold; font-size: 15px;"
-      f" color: #1e293b; padding-top: 6px;'>"
+      f"<h3 style='text-align: center; margin: 0; color: #1e293b; font-size:"
+      f" 16px; padding-top: 6px;'>"
       f"{st.session_state.start_week_date.strftime('%Y/%m/%d')} ~"
-      f" {end_date_display.strftime('%Y/%m/%d')}</div>",
+      f" {end_date_display.strftime('%Y/%m/%d')}</h3>",
       unsafe_allow_html=True,
   )
 
-  if c_next.button("下週 ▶", use_container_width=True):
+  if c_next.button("下一星期 ▶", use_container_width=True):
     st.session_state.start_week_date += timedelta(weeks=1)
     st.rerun()
 
@@ -302,66 +321,92 @@ with col_center:
   }
 
   last_month = None
-  week_days_name = ["日", "一", "二", "三", "四", "五", "六"]
+  week_days = ["日", "一", "二", "三", "四", "五", "六"]
 
-  # 以直向卡片逐個星期顯示，手機睇極之清晰順暢
+  # 用 HTML 包裹整個月曆，實現手機橫向滾動（Overflow Scroll）
+  st.markdown(
+      '<div class="calendar-scroll-container"><div'
+      ' class="calendar-table-wrapper">',
+      unsafe_allow_html=True,
+  )
+
+  # 星期標題列 (8欄：左邊極窄月份欄 + 7日星期)
+  header_cols = st.columns([0.45, 1, 1, 1, 1, 1, 1, 1])
+  header_cols[0].markdown(
+      "<div style='font-weight: bold; text-align: center;"
+      " background-color: #e2e8f0; padding: 6px 2px; border-radius: 4px;"
+      " color: #334155; font-size: 11px;'>月份</div>",
+      unsafe_allow_html=True,
+  )
+  for i, day_name in enumerate(week_days):
+    header_cols[i + 1].markdown(
+        f"<div style='font-weight: bold; text-align: center;"
+        f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
+        f" color: #334155; font-size: 12px;'>{day_name}</div>",
+        unsafe_allow_html=True,
+    )
+
+  # 連續渲染 10 個星期
   for w in range(10):
     week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
     week_thursday = week_start_d + timedelta(days=4)
     current_month = week_thursday.month
 
-    # 如果轉咗月份，顯示一個靚靚嘅月份大標題（直行合併嘅完美替代）
-    if current_month != last_month:
-      st.markdown(
-          f"<div style='margin-top: 15px; margin-bottom: 8px; font-size:"
-          f" 16px; font-weight: bold; color: #0284c7; background-color:"
-          f" #f0f9ff; padding: 6px 12px; border-radius: 6px; border-left: 4px"
-          f" solid #0284c7;'>🌸 {current_month}月</div>",
-          unsafe_allow_html=True,
-      )
-      last_month = current_month
+    row_cols = st.columns([0.45, 1, 1, 1, 1, 1, 1, 1])
 
-    # 每個星期一個靚靚嘅外框容器
-    with st.container(border=True):
-      week_end_d = week_start_d + timedelta(days=6)
-      st.markdown(
-          f"<div style='font-weight: bold; color: #334155; font-size: 13px;"
-          f" margin-bottom: 6px;'>第 {w+1} 週 ({week_start_d.strftime('%m/%d')} ~"
-          f" {week_end_d.strftime('%m/%d')})</div>",
-          unsafe_allow_html=True,
-      )
-
-      # 順序顯示呢個星期有活動嘅日子（如果成個星期冇活動都可以顯示簡要或只顯示有活動嘅日子）
-      has_any_event = False
-      for i in range(7):
-        current_d = week_start_d + timedelta(days=i)
-        day_events = schedule.get(current_d, [])
-
-        if day_events:
-          has_any_event = True
-          day_str = (
-              f"{current_d.month}/{current_d.day}"
-              f" ({week_days_name[i]})"
-          )
-          for ev in day_events:
-            emoji = color_emojis.get(ev["color"], "📌")
-            cols_ev = st.columns([1, 4, 1])
-            cols_ev[0].markdown(
-                f"<span style='color: #64748b; font-size: 12px; font-weight:"
-                f" bold;'>{day_str}</span>",
-                unsafe_allow_html=True,
-            )
-            cols_ev[1].markdown(
-                f"<span style='font-size: 13px;'>{emoji} <b>{ev['name']}</b>"
-                f" ({ev['time']})</span>",
-                unsafe_allow_html=True,
-            )
-            if cols_ev[2].button("✕", key=f"mob_del_{current_d}_{ev['item_id']}"):
-              delete_schedule_db(ev["item_id"])
-              st.rerun()
-
-      if not has_any_event:
+    # 左邊直行月份標籤：新月份開始時顯示一次，其餘行保持直行連貫外框
+    with row_cols[0]:
+      if current_month != last_month:
         st.markdown(
-            "<span style='color: #94a3b8; font-size: 12px;'>呢個星期暫未有活動</span>",
+            f"<div style='height: 100%; min-height: 150px; display: flex;"
+            f" flex-direction: column; align-items: center; justify-content:"
+            f" center; font-weight: bold; color: #0284c7;"
+            f" background-color: #f0f9ff; border-left: 3px solid #0284c7;"
+            f" border-radius: 4px; font-size: 12px; text-align: center; padding:"
+            f" 2px;'>🌸<br>{current_month}月</div>",
             unsafe_allow_html=True,
         )
+        last_month = current_month
+      else:
+        st.markdown(
+            "<div style='min-height: 150px; border-left: 3px solid #e0f2fe;'>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    # 渲染 7 日格仔
+    for i in range(7):
+      current_d = week_start_d + timedelta(days=i)
+      day_events = schedule.get(current_d, [])
+
+      with row_cols[i + 1]:
+        with st.container(border=True):
+          st.markdown(
+              f"<div style='font-size: 13px; font-weight: bold; color:"
+              f" #475569;'>{current_d.month}/{current_d.day}</div>",
+              unsafe_allow_html=True,
+          )
+
+          rendered_count = 0
+          if day_events:
+            for ev in day_events:
+              emoji = color_emojis.get(ev["color"], "📌")
+              c_txt, c_del = st.columns([6, 1])
+              with c_txt:
+                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+              with c_del:
+                if st.button(
+                    "✕", key=f"del_10w_{current_d.isoformat()}_{ev['item_id']}"
+                ):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
+              rendered_count += 1
+
+          while rendered_count < 2:
+            st.caption(
+                "<span style='opacity:0; user-select:none;'>-</span>",
+                unsafe_allow_html=True,
+            )
+            rendered_count += 1
+
+  st.markdown("</div></div>", unsafe_allow_html=True)
