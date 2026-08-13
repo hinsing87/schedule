@@ -6,6 +6,66 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
+# 自訂 CSS 打造完美對齊嘅傳統月曆網格
+st.markdown(
+    """
+    <style>
+    /* 整個星期行嘅容器：使用 CSS Grid 確保同一行（同一星期）嘅 7 個格子高度自動一致 */
+    .calendar-week {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+    /* 單個日期格子：設定統一嘅最小高度（足夠放兩個活動及刪除掣） */
+    .calendar-box {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 140px;
+        background-color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        display: flex;
+        flex-direction: column;
+    }
+    .calendar-box-empty {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 140px;
+        background-color: #f8fafc;
+        opacity: 0.3;
+    }
+    .calendar-header {
+        font-weight: bold;
+        text-align: center;
+        background-color: #f1f5f9;
+        padding: 8px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        color: #334155;
+    }
+    .day-num {
+        font-size: 14px;
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
+    /* 活動標籤與右側刪除符號嘅行排版 */
+    .event-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 6px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        font-size: 11px;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -132,13 +192,13 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
-# 顏色對應的標籤 style
+# 顏色對應嘅 CSS 樣式
 color_styles = {
-    "粉紅": "background-color: #fce7f3; color: #9d174d; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
-    "藍色": "background-color: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
-    "紫色": "background-color: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
-    "綠色": "background-color: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
-    "黃色": "background-color: #fefce8; color: #854d0e; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
+    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a;",
 }
 
 activities = get_activities()
@@ -269,10 +329,8 @@ with col_center:
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
   header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
-    header_cols[i.item() if hasattr(i, 'item') else i].markdown(
-        f"<div style='text-align: center; font-weight: bold; background-color:"
-        f" #f1f5f9; padding: 6px; border-radius: 4px; color:"
-        f" #334155;'>{day_name}</div>",
+    header_cols[i].markdown(
+        f"<div class='calendar-header'>{day_name}</div>",
         unsafe_allow_html=True,
     )
 
@@ -282,18 +340,15 @@ with col_center:
       st.session_state.view_year, st.session_state.view_month
   )
 
-  # 渲染月曆格子（每一行代表一星期）
+  # 檢查點擊刪除嘅回調邏輯（透過 query params 或直接檢查 button）
+  # 由於用左 CSS Grid，我們用 Streamlit 原生 columns 去精準對應每一周嘅 7 個格子
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          # 空白格
           st.markdown(
-              "<div style='border: 1px solid #e2e8f0; border-radius: 8px;"
-              " padding: 6px; min-height: 120px; background-color: #f8fafc;"
-              " opacity: 0.3;'></div>",
-              unsafe_allow_html=True,
+              "<div class='calendar-box-empty'></div>", unsafe_allow_html=True
           )
         else:
           current_d = date(
@@ -301,22 +356,31 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 用 Streamlit 容器代替純 HTML 框，確保所有活動同刪除掣完美鎖死喺個格仔入面
-          with st.container(border=True):
-            st.markdown(f"**{day}**")
+          # 組合該日格子嘅 HTML 內容
+          events_html = ""
+          for ev in day_events:
+            style_str = color_styles.get(ev["color"], color_styles["藍色"])
+            events_html += f"""
+                    <div class='event-row' style='{style_str}'>
+                        <span><b>{ev['name']}</b> ({ev['time']})</span>
+                    </div>
+                    """
 
-            if day_events:
-              for ev in day_events:
-                style_str = color_styles.get(ev["color"], color_styles["藍色"])
-                st.markdown(
-                    f"<div style='{style_str}'><b>{ev['name']}</b><br>⏰"
-                    f" {ev['time']}</div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button(
-                    "❌ 刪除",
-                    key=f"del_{ev['item_id']}",
-                    use_container_width=True,
-                ):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
+          st.markdown(
+              f"""
+                <div class='calendar-box'>
+                    <div class='day-num'>{day}</div>
+                    {events_html}
+                </div>
+                """,
+              unsafe_allow_html=True,
+          )
+
+          # 在日子供應精緻嘅右側刪除符號按鈕 (✕)
+          if day_events:
+            for ev in day_events:
+              if st.button(
+                  "✕", key=f"del_{ev['item_id']}", help=f"刪除 {ev['name']}"
+              ):
+                delete_schedule_db(ev["item_id"])
+                st.rerun()
