@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：運用相對與絕對定位，將刪除按鈕完美嵌入活動標籤內部右上角
+# 自訂 CSS 確保月曆外觀企理
 st.markdown(
     """
     <style>
@@ -17,7 +17,6 @@ st.markdown(
         min-height: 150px;
         background-color: #ffffff;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-        position: relative;
     }
     .calendar-box-empty {
         border: 1px solid #e2e8f0;
@@ -41,23 +40,6 @@ st.markdown(
         font-weight: bold;
         color: #1e293b;
         margin-bottom: 6px;
-    }
-    /* 活動標籤包裝盒（設定為 relative 俾入面嘅刪除掣定位） */
-    .event-card {
-        position: relative;
-        padding: 6px 24px 6px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        margin-bottom: 4px;
-    }
-    /* 絕對定位嘅刪除連結，完美貼在活動標籤右上角 */
-    .event-delete-btn {
-        position: absolute;
-        top: 4px;
-        right: 6px;
-        text-decoration: none;
-        font-weight: bold;
-        font-size: 12px;
     }
     </style>
 """,
@@ -190,33 +172,13 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
-# 顏色對應樣式與刪除掣顏色
+# 顏色對應樣式
 color_styles = {
-    "粉紅": (
-        "background-color: #fce7f3; color: #9d174d; border: 1px solid"
-        " #fbcfe8;",
-        "color: #db2777;",
-    ),
-    "藍色": (
-        "background-color: #eff6ff; color: #1e40af; border: 1px solid"
-        " #bfdbfe;",
-        "color: #3b82f6;",
-    ),
-    "紫色": (
-        "background-color: #f3e8ff; color: #6b21a8; border: 1px solid"
-        " #e9d5ff;",
-        "color: #9333ea;",
-    ),
-    "綠色": (
-        "background-color: #f0fdf4; color: #166534; border: 1px solid"
-        " #bbf7d0;",
-        "color: #16a34a;",
-    ),
-    "黃色": (
-        "background-color: #fefce8; color: #854d0e; border: 1px solid"
-        " #fef08a;",
-        "color: #ca8a04;",
-    ),
+    "粉紅": "background-color: #fce7f3; color: #9d174d; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; padding: 6px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fef08a;",
 }
 
 activities = get_activities()
@@ -316,14 +278,6 @@ with col_center:
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
-  # 處理網址參數刪除動作
-  query_params = st.query_params
-  if "delete_item" in query_params:
-    del_id = query_params["delete_item"]
-    delete_schedule_db(del_id)
-    st.query_params.clear()
-    st.rerun()
-
   # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
@@ -381,25 +335,26 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 組合活動標籤與絕對定位嘅刪除按鈕 (✕)
-          events_html = ""
-          for ev in day_events:
-            box_style, btn_style = color_styles.get(
-                ev["color"], color_styles["藍色"]
-            )
-            events_html += f"""
-                    <div class='event-card' style='{box_style}'>
-                        <b>{ev['name']}</b><br>{ev['time']}
-                        <a href='?delete_item={ev['item_id']}' class='event-delete-btn' style='{btn_style}' title='刪除'>✕</a>
-                    </div>
-                    """
-
+          # 每個日期格子開頭
           st.markdown(
-              f"""
-                <div class='calendar-box'>
-                    <div class='day-num'>{day}</div>
-                    {events_html}
-                </div>
-                """,
+              f"<div class='calendar-box'><div"
+              f" class='day-num'>{day}</div>",
               unsafe_allow_html=True,
           )
+
+          # 絕對安全穩陣：使用原生 Markdown 顯示活動名稱，配合精緻刪除按鈕
+          if day_events:
+            for ev in day_events:
+              style_str = color_styles.get(ev["color"], color_styles["藍色"])
+              # 用安全嘅 container 確保排版內嵌在格子內
+              with st.container():
+                st.markdown(
+                    f"<div"
+                    f" style='{style_str}'><b>{ev['name']}</b> ({ev['time']})</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button("🗑️ 刪除", key=f"del_{ev['item_id']}"):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
+
+          st.markdown("</div>", unsafe_allow_html=True)
