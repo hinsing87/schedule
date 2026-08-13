@@ -6,31 +6,31 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：將月曆格高加高，並將特定刪除按鈕偽裝成無邊框嘅紅色 X
+# 自訂 CSS：徹底清除按鈕的邊框與背景，變成純文字紅色的 X
 st.markdown(
     """
     <style>
-    /* 略為加高月曆格子，確保兩行活動加佔位符時完美不擁擠 */
+    /* 略為加高月曆格子 */
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
         min-height: 135px;
     }
     
-    /* 將用作刪除的按鈕變成無邊框、紅色、極細嘅文字按鈕樣式 */
-    button[key^="del_btn_"] {
+    /* 針對所有次要按鈕（即刪除按鈕）進行無邊框、透明化處理 */
+    button[kind="secondary"] {
         background-color: transparent !important;
         border: none !important;
+        box-shadow: none !important;
         color: #ef4444 !important;
-        font-size: 14px !important;
         font-weight: bold !important;
+        font-size: 14px !important;
         padding: 0px !important;
         min-height: unset !important;
-        height: auto !important;
-        box-shadow: none !important;
+        height: 24px !important;
     }
-    button[key^="del_btn_"]:hover {
-        color: #991b1b !important;
+    button[kind="secondary"]:hover {
         background-color: #fee2e2 !important;
-        border-radius: 3px !important;
+        color: #991b1b !important;
+        border-radius: 4px !important;
     }
     </style>
 """,
@@ -337,8 +337,7 @@ with col_center:
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
                 with c_del:
-                  # 使用原生 button 配搭 CSS key 前綴，做到無邊框紅色 X 且留在原頁
-                  if st.button("✕", key=f"del_btn_{ev['item_id']}"):
+                  if st.button("✕", key=f"del_{ev['item_id']}"):
                     delete_schedule_db(ev["item_id"])
                     st.rerun()
                 rendered_count += 1
