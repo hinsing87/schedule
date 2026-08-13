@@ -198,8 +198,8 @@ with col_left:
     )
     chosen_info = activities[selected_act_id]
 
-    c_btn1, c_btn2 = st.columns(2)
-    if c_btn1.button("📅 單次新增", use_container_width=True):
+    c_btn1, c_btn2, c_btn3 = st.columns(3)
+    if c_btn1.button("📅 單次", use_container_width=True):
       item_id = str(uuid.uuid4())[:8]
       add_schedule_db(
           item_id,
@@ -212,7 +212,7 @@ with col_left:
       st.success("成功安排！")
       st.rerun()
 
-    if c_btn2.button("🔄 重複加4週", use_container_width=True):
+    if c_btn2.button("🔄 4週", use_container_width=True):
       for i in range(4):
         target_date = sel_date + timedelta(weeks=i)
         item_id = str(uuid.uuid4())[:8]
@@ -224,7 +224,22 @@ with col_left:
             chosen_info["time"],
             chosen_info["color"],
         )
-      st.success("成功新增未來4週！")
+      st.success("成功新增4週！")
+      st.rerun()
+
+    if c_btn3.button("🚀 8週", use_container_width=True):
+      for i in range(8):
+        target_date = sel_date + timedelta(weeks=i)
+        item_id = str(uuid.uuid4())[:8]
+        add_schedule_db(
+            item_id,
+            selected_act_id,
+            target_date.isoformat(),
+            chosen_info["name"],
+            chosen_info["time"],
+            chosen_info["color"],
+        )
+      st.success("成功新增8週！")
       st.rerun()
 
   st.divider()
