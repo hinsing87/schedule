@@ -170,35 +170,7 @@ col_left, col_center = st.columns([1, 2.8], gap="large")
 with col_left:
   st.header("⚙️ 活動設定與排程")
 
-  # 1. 新增活動種類
-  with st.expander("＋ 新增活動種類", expanded=True):
-    act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
-    act_time = st.text_input("時間 (例如: 16:00)")
-    act_color = st.selectbox(
-        "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
-    )
-    if st.button("確認新增活動"):
-      if act_name:
-        new_id = str(uuid.uuid4())[:8]
-        add_activity_db(new_id, act_name, act_time, act_color)
-        st.success(f"已新增: {act_name}")
-        st.rerun()
-
-  # 2. 現有活動庫管理
-  st.subheader("📋 現有活動庫")
-  if not activities:
-    st.write("暫時未有活動。")
-  else:
-    for act_id, info in list(activities.items()):
-      c_a, c_b = st.columns([3, 1])
-      c_a.write(f"**{info['name']}** ({info['time']})")
-      if c_b.button("🗑️", key=f"del_act_{act_id}"):
-        delete_activity_db(act_id)
-        st.rerun()
-
-  st.divider()
-
-  # 3. 將活動安排到指定日期
+  # 1. 將活動安排到指定日期 (移到最上方)
   st.subheader("📌 安排活動到日期")
   if activities:
     sel_date = st.date_input("選擇日期", value=date.today())
@@ -241,6 +213,34 @@ with col_left:
         )
       st.success("成功新增未來4週！")
       st.rerun()
+
+  st.divider()
+
+  # 2. 新增活動種類
+  with st.expander("＋ 新增活動種類", expanded=False):
+    act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
+    act_time = st.text_input("時間 (例如: 16:00)")
+    act_color = st.selectbox(
+        "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
+    )
+    if st.button("確認新增活動"):
+      if act_name:
+        new_id = str(uuid.uuid4())[:8]
+        add_activity_db(new_id, act_name, act_time, act_color)
+        st.success(f"已新增: {act_name}")
+        st.rerun()
+
+  # 3. 現有活動庫管理
+  st.subheader("📋 現有活動庫")
+  if not activities:
+    st.write("暫時未有活動。")
+  else:
+    for act_id, info in list(activities.items()):
+      c_a, c_b = st.columns([3, 1])
+      c_a.write(f"**{info['name']}** ({info['time']})")
+      if c_b.button("🗑️", key=f"del_act_{act_id}"):
+        delete_activity_db(act_id)
+        st.rerun()
 
 with col_center:
   st.header("🗓️ 月曆總覽")
@@ -324,7 +324,6 @@ with col_center:
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                # 用 5:1 比例讓刪除掣更小、更貼近文字
                 c_txt, c_del = st.columns([5, 1])
                 with c_txt:
                   st.caption(f"{emoji} {ev['name']} ({ev['time']})")
@@ -334,7 +333,6 @@ with col_center:
                     st.rerun()
                 rendered_count += 1
 
-            # 確保高度統一
             while rendered_count < 2:
               st.caption(
                   "<span"
