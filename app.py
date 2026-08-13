@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS 打造完美月曆網格，確保同一星期高度一致
+# 自訂 CSS 確保月曆外觀企理
 st.markdown(
     """
     <style>
@@ -17,8 +17,6 @@ st.markdown(
         min-height: 150px;
         background-color: #ffffff;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-        display: flex;
-        flex-direction: column;
     }
     .calendar-box-empty {
         border: 1px solid #e2e8f0;
@@ -42,16 +40,6 @@ st.markdown(
         font-weight: bold;
         color: #1e293b;
         margin-bottom: 6px;
-    }
-    /* 活動項目的外觀樣式 */
-    .event-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 4px 6px;
-        border-radius: 6px;
-        margin-bottom: 4px;
-        font-size: 11px;
     }
     </style>
 """,
@@ -184,13 +172,13 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
-# 顏色對應嘅 CSS 樣式
+# 顏色對應嘅背景/文字框樣式
 color_styles = {
-    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;",
-    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;",
-    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;",
-    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;",
-    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a;",
+    "粉紅": "background-color: #fce7f3; color: #9d174d; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 4px; border: 1px solid #fef08a;",
 }
 
 activities = get_activities()
@@ -290,14 +278,6 @@ with col_center:
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
-  # 檢查網址參數是否有刪除動作（透過輕量 Query Params 達成完美右側刪除按鈕）
-  query_params = st.query_params
-  if "delete_item" in query_params:
-    del_id = query_params["delete_item"]
-    delete_schedule_db(del_id)
-    st.query_params.clear()
-    st.rerun()
-
   # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
@@ -355,24 +335,30 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 組合活動標籤與右側精緻刪除按鈕 (✕)
-          events_html = ""
-          for ev in day_events:
-            c_style = color_styles.get(ev["color"], color_styles["藍色"])
-            # 透過超連結呼叫網址參數觸發刪除，完美貼在活動右側且不佔位、不走位
-            events_html += f"""
-                    <div class='event-item' style='{c_style}'>
-                        <span><b>{ev['name']}</b> ({ev['time']})</span>
-                        <a href='?delete_item={ev['item_id']}' style='color: #94a3b8; text-decoration: none; font-weight: bold; margin-left: 6px; padding: 0 3px;' title='刪除'>✕</a>
-                    </div>
-                    """
-
+          # 每個日期格子開頭
           st.markdown(
-              f"""
-                <div class='calendar-box'>
-                    <div class='day-num'>{day}</div>
-                    {events_html}
-                </div>
-                """,
+              f"<div class='calendar-box'><div"
+              f" class='day-num'>{day}</div>",
               unsafe_allow_html=True,
           )
+
+          # 顯示該日活動（用原生 Streamlit columns 確保排版絕對整齊靚仔）
+          if day_events:
+            for ev in day_events:
+              style_str = color_styles.get(ev["color"], color_styles["藍色"])
+              # 活動資訊與刪除按鈕並排
+              ev_col1, ev_col2 = st.columns([5, 1])
+              with ev_col1:
+                st.markdown(
+                    f"<div"
+                    f" style='{style_str}'><b>{ev['name']}</b><br>{ev['time']}</div>",
+                    unsafe_allow_html=True,
+                )
+              with ev_col2:
+                if st.button(
+                    "✕", key=f"del_item_{ev['item_id']}", help="刪除"
+                ):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
+
+          st.markdown("</div>", unsafe_allow_html=True)
