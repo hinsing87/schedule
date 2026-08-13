@@ -111,8 +111,8 @@ def add_activity_db(act_id, name, time, color):
 def delete_activity_db(act_id):
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
+  # 只刪除活動庫中的種類，不再刪除 schedule 裡面的紀錄
   c.execute("DELETE FROM activities WHERE act_id = ?", (act_id,))
-  c.execute("DELETE FROM schedule WHERE act_id = ?", (act_id,))
   conn.commit()
   conn.close()
 
@@ -244,19 +244,21 @@ with col_left:
 
   st.divider()
 
-  # 2. 新增活動種類
-  with st.expander("＋ 新增活動種類", expanded=False):
-    act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
-    act_time = st.text_input("時間 (例如: 16:00)")
-    act_color = st.selectbox(
-        "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
-    )
-    if st.button("確認新增活動"):
-      if act_name:
-        new_id = str(uuid.uuid4())[:8]
-        add_activity_db(new_id, act_name, act_time, act_color)
-        st.success(f"已新增: {act_name}")
-        st.rerun()
+  # 2. 新增活動種類 (直接展開)
+  st.subheader("＋ 新增活動種類")
+  act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
+  act_time = st.text_input("時間 (例如: 16:00)")
+  act_color = st.selectbox(
+      "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
+  )
+  if st.button("確認新增活動", use_container_width=True):
+    if act_name:
+      new_id = str(uuid.uuid4())[:8]
+      add_activity_db(new_id, act_name, act_time, act_color)
+      st.success(f"已新增: {act_name}")
+      st.rerun()
+
+  st.divider()
 
   # 3. 現有活動庫管理
   st.subheader("📋 現有活動庫")
