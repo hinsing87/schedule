@@ -4,7 +4,7 @@ import sqlite3
 import uuid
 import streamlit as st
 
-st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
+st.set_page_config(page_title="囡囡課外活動管理助手", layout="wide")
 
 # 自訂 CSS：強制光亮模式背景及精緻刪除按鈕
 st.markdown(
@@ -175,14 +175,13 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 自動偵測是否為手機版 (透過 Streamlit Header User-Agent) ---
+# --- 自動偵測是否為手機版 ---
 headers = st.context.headers
 ua = headers.get("User-Agent", "").lower() if headers else ""
 is_mobile = any(
     device in ua for device in ["iphone", "android", "ipad", "mobile"]
 )
 
-# 亦可提供手動切換開關 (放在側邊欄或頂部以防萬一)
 with st.sidebar:
   st.header("⚙️ 顯示設定")
   override_mode = st.radio(
@@ -239,10 +238,12 @@ with col_calendar:
   }
 
   # ==========================================
-  # A. 手機版：上下清單檢視 (當偵測到手機時執行)
+  # A. 手機版：上下清單檢視 (已修正星期對應)
   # ==========================================
   if is_mobile:
     st.header("📋 黎緊 10 個星期活動清單 (手機專用)")
+    # Python weekday(): 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+    # 我們的星期陣列由星期日開始：[日, 一, 二, 三, 四, 五, 六]
     weekdays_zh = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
 
     for w in range(10):
@@ -256,7 +257,8 @@ with col_calendar:
       for i in range(7):
         current_d = week_start_d + timedelta(days=i)
         day_events = schedule.get(current_d, [])
-        w_day_name = weekdays_zh[current_d.weekday() % 7]
+        # 修正：正確對應星期 (current_d.weekday() + 1) % 7 確保 0=日, 1=一...6=六
+        w_day_name = weekdays_zh[(current_d.weekday() + 1) % 7]
 
         with st.container(border=True):
           col_d_info, col_d_act = st.columns([1.2, 3])
@@ -292,7 +294,7 @@ with col_calendar:
               )
 
   # ==========================================
-  # B. 電腦版：橫向月曆檢視 (當偵測到電腦時執行)
+  # B. 電腦版：橫向月曆檢視
   # ==========================================
   else:
     st.header("🗓️ 黎緊 10 個星期總覽 (月曆)")
