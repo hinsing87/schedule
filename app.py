@@ -4,18 +4,18 @@ import sqlite3
 import uuid
 import streamlit as st
 
-st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
+st.set_page_config(page_title="Narisa課外活動助手", layout="wide")
 
-# 自訂 CSS：徹底清除按鈕的邊框與背景，變成純文字紅色的 X
+# 自訂 CSS：將月曆格高加高到 155px，確保兩行活動完美鬆動
 st.markdown(
     """
     <style>
-    /* 略為加高月曆格子 */
+    /* 將月曆格子高度由 135px 提升到 155px，解決兩行活動時爭少少嘅問題 */
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 135px;
+        min-height: 155px;
     }
     
-    /* 針對所有次要按鈕（即刪除按鈕）進行無邊框、透明化處理 */
+    /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
     button[kind="secondary"] {
         background-color: transparent !important;
         border: none !important;
