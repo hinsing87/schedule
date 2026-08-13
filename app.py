@@ -6,6 +6,19 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
+# 自訂 CSS：強制設定月曆格子預設高度，確保至少放到兩行活動
+st.markdown(
+    """
+    <style>
+    /* 調整 container 最小高度，確保夠位放至少兩行 */
+    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
+        min-height: 140px;
+    }
+    </style>
+""",
+    unsafe_allow_html=True,
+)
+
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -273,7 +286,6 @@ with col_center:
       st.session_state.view_year, st.session_state.view_month
   )
 
-  # 顏色對應的簡單 Emoji 或標示
   color_emojis = {
       "粉紅": "🌸",
       "藍色": "🔷",
@@ -282,13 +294,12 @@ with col_center:
       "黃色": "🟡",
   }
 
-  # 渲染月曆格子 (完全使用 Streamlit 原生 st.container(border=True))
+  # 渲染月曆格子
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          # 空白格
           with st.container(border=False):
             st.write("")
         else:
@@ -297,14 +308,17 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 用原生有框容器代表每一日
           with st.container(border=True):
             st.markdown(f"**{day}**")
 
             if day_events:
               for ev in day_events:
                 emoji = color_emojis.get(ev["color"], "📌")
-                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
-                if st.button("刪除", key=f"del_{ev['item_id']}"):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
+                # 用 4:1 比例將活動文字與極簡「✕」按鈕迫在同一行
+                c_txt, c_del = st.columns([4, 1])
+                with c_txt:
+                  st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+                with c_del:
+                  if st.button("✕", key=f"del_{ev['item_id']}"):
+                    delete_schedule_db(ev["item_id"])
+                    st.rerun()
