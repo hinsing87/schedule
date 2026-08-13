@@ -6,49 +6,22 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：電腦版與手機版完美適應的表格樣式
+# 自訂 CSS：確保手機可以順滑橫向滾動，且按鈕極細精緻
 st.markdown(
     """
     <style>
-    .calendar-scroll-container {
+    /* 手機橫向滾動外框 */
+    .week-scroll-container {
         width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        margin-bottom: 10px;
+        white-space: nowrap;
+        margin-bottom: 8px;
     }
-    .custom-cal-table {
-        width: 100%;
-        min-width: 800px;
-        border-collapse: collapse;
-        table-layout: fixed;
-        background-color: white;
-    }
-    .custom-cal-table th {
-        background-color: #f1f5f9;
-        color: #334155;
-        font-size: 13px;
-        padding: 8px;
-        border: 1px solid #e2e8f0;
-        text-align: center;
-    }
-    .custom-cal-table td {
-        border: 1px solid #e2e8f0;
-        padding: 6px;
-        vertical-align: top;
-        height: 90px;
-        background-color: #ffffff;
-    }
-    .month-col {
-        width: 7%;
-        font-weight: bold;
-        color: #0284c7;
-        background-color: #f0f9ff !important;
-        text-align: center;
-        vertical-align: middle !important;
-        font-size: 13px;
-    }
-    .day-col {
-        width: 13.2%;
+    .week-inner {
+        display: inline-flex;
+        min-width: 750px;
+        gap: 6px;
     }
     
     /* 極細精緻刪除按鈕 */
@@ -255,85 +228,99 @@ with col_calendar:
 
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
 
-  # 計算每個月分跨幾行 (Rowspan)
-  month_spans = []
-  for w in range(10):
-    w_start = st.session_state.start_week_date + timedelta(days=w * 7)
-    m = (w_start + timedelta(days=4)).month
-    month_spans.append(m)
-
-  # 開始建構完美表格
+  # 1. 星期標題列 (用橫向滾動容器包住)
   st.markdown(
-      '<div class="calendar-scroll-container"><table'
-      " class='custom-cal-table'><thead><tr>",
+      '<div class="week-scroll-container"><div class="week-inner">',
       unsafe_allow_html=True,
   )
-  st.markdown("<th class='month-col'>月份</th>", unsafe_allow_html=True)
-  for d in week_days:
-    st.markdown(f"<th class='day-col'>{d}</th>", unsafe_allow_html=True)
-  st.markdown("</tr></thead><tbody>", unsafe_allow_html=True)
+  h_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
+  h_cols[0].markdown(
+      "<div style='font-weight: bold; text-align: center; background-color:"
+      " #e2e8f0; padding: 6px 2px; border-radius: 4px; color: #334155; font-size:"
+      " 11px;'>月份</div>",
+      unsafe_allow_html=True,
+  )
+  for idx, d_name in enumerate(week_days):
+    h_cols[idx + 1].markdown(
+        f"<div style='font-weight: bold; text-align: center;"
+        f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
+        f" color: #334155; font-size: 12px;'>{d_name}</div>",
+        unsafe_allow_html=True,
+    )
+  st.markdown("</div></div>", unsafe_allow_html=True)
 
-  i = 0
-  while i < 10:
-    m = month_spans[i]
-    count = 0
-    j = i
-    while j < 10 and month_spans[j] == m:
-      count += 1
-      j += 1
+  last_month = None
 
-    for row_idx in range(i, j):
-      week_start_d = st.session_state.start_week_date + timedelta(
-          days=row_idx * 7
-      )
+  # 2. 10 個星期循環渲染
+  for w in range(10):
+    week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
+    current_month = (week_start_d + timedelta(days=4)).month
 
-      # 輸出每一行的開頭
-      row_tags = "<tr>"
-      if row_idx == i:
-        row_tags += f"<td class='month-col' rowspan='{count}'>🌸<br>{m}月</td>"
-      st.markdown(row_tags, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="week-scroll-container"><div class="week-inner">',
+        unsafe_allow_html=True,
+    )
+    row_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
 
-      # 渲染 7 日格子入面既內容
-      for d_idx in range(7):
-        curr_d = week_start_d + timedelta(d_idx)
-        day_events = schedule.get(curr_d, [])
+    # 月份欄
+    with row_cols[0]:
+      if current_month != last_month:
+        st.markdown(
+            f"<div style='min-height: 100px; display: flex; flex-direction:"
+            f" column; align-items: center; justify-content: center; font-weight:"
+            f" bold; color: #0284c7; background-color: #f0f9ff; border-left:"
+            f" 3px solid #0284c7; border-radius: 4px; font-size: 12px; text-align:"
+            f" center; padding: 2px;'>🌸<br>{current_month}月</div>",
+            unsafe_allow_html=True,
+        )
+        last_month = current_month
+      else:
+        st.markdown(
+            "<div style='min-height: 100px; border-left: 3px solid #e0f2fe;'>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-        # 用 Streamlit Container 確保入面既刪除按鈕可以完美運作
-        with st.container():
-          # 這裡我們用一個細格包住
-          cell_container = st.columns([1])
-          with cell_container[0]:
-            st.markdown(
-                f"<div style='font-size: 11px; font-weight: bold; color:"
-                f" #475569; margin-bottom: 2px;'>{curr_d.month}/{curr_d.day}</div>",
+    # 7 日格子
+    for i in range(7):
+      current_d = week_start_d + timedelta(days=i)
+      day_events = schedule.get(current_d, [])
+
+      with row_cols[i + 1]:
+        with st.container(border=True):
+          st.markdown(
+              f"<div style='font-size: 11px; font-weight: bold; color:"
+              f" #475569;'>{current_d.month}/{current_d.day}</div>",
+              unsafe_allow_html=True,
+          )
+
+          rendered_count = 0
+          if day_events:
+            for ev in day_events:
+              emoji = color_emojis.get(ev["color"], "📌")
+              c_txt, c_del = st.columns([5, 1])
+              with c_txt:
+                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+              with c_del:
+                if st.button(
+                    "✕", key=f"del_w_{current_d.isoformat()}_{ev['item_id']}"
+                ):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
+              rendered_count += 1
+
+          while rendered_count < 2:
+            st.caption(
+                "<span style='opacity:0; user-select:none;'>-</span>",
                 unsafe_allow_html=True,
             )
-            if day_events:
-              for ev in day_events:
-                emoji = color_emojis.get(ev["color"], "📌")
-                c_txt, c_del = st.columns([5, 1])
-                with c_txt:
-                  st.markdown(
-                      f"<div style='font-size: 11px; color: #1e293b;"
-                      f" white-space: nowrap;'>{emoji} {ev['name']}</div>",
-                      unsafe_allow_html=True,
-                  )
-                with c_del:
-                  if st.button(
-                      "✕",
-                      key=f"del_tbl_{curr_d.isoformat()}_{ev['item_id']}",
-                  ):
-                    delete_schedule_db(ev["item_id"])
-                    st.rerun()
+            rendered_count += 1
 
-      st.markdown("</tr>", unsafe_allow_html=True)
-    i = j
-
-  st.markdown("</tbody></table></div>", unsafe_allow_html=True)
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
   st.markdown(
       "<p style='color: #64748b; font-size: 11px; text-align: center;"
-      " margin-top: 4px;'>💡 手機版可左右滑動查看完整 7 日日曆</p>",
+      " margin-top: 6px;'>💡 手機瀏覽時可左右滑動查看完整 7 日日曆</p>",
       unsafe_allow_html=True,
   )
 
