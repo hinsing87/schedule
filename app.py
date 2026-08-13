@@ -6,12 +6,12 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：上下雙月月曆格高度與樣式微調
+# 自訂 CSS：10週月曆格高度與樣式微調
 st.markdown(
     """
     <style>
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 160px;
+        min-height: 150px;
     }
     
     [data-testid="stContainer"] {
@@ -111,7 +111,6 @@ def add_activity_db(act_id, name, time, color):
 def delete_activity_db(act_id):
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
-  # 只刪除活動庫中的種類，不再刪除 schedule 裡面的紀錄
   c.execute("DELETE FROM activities WHERE act_id = ?", (act_id,))
   conn.commit()
   conn.close()
@@ -177,7 +176,7 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 版面配置：左邊設定，中間上下雙月大月曆 ---
+# --- 版面配置：左邊設定，中間 10 週連續檢視 ---
 col_left, col_center = st.columns([1, 3.2], gap="large")
 
 with col_left:
@@ -244,7 +243,7 @@ with col_left:
 
   st.divider()
 
-  # 2. 新增活動種類 (直接展開)
+  # 2. 新增活動種類
   st.subheader("＋ 新增活動種類")
   act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
   act_time = st.text_input("時間 (例如: 16:00)")
@@ -273,115 +272,94 @@ with col_left:
         st.rerun()
 
 with col_center:
-  st.header("🗓️ 雙月月曆總覽")
+  st.header("🗓️ 黎緊 10 個星期總覽")
 
-  # 處理 Session State 中的年月切換（以第一個月份為準）
-  if "view_year" not in st.session_state:
-    st.session_state.view_year = date.today().year
-  if "view_month" not in st.session_state:
-    st.session_state.view_month = date.today().month
+  # 預設第一行由今個星期開始（以本週星期日作為起始點，配合日曆星期日行頭）
+  today = date.today()
+  #計算今個星期日 (Python weekday(): 0係星期一, 6係星期日)
+  days_to_sunday = (today.weekday() + 1) % 7
+  current_sunday = today - timedelta(days=days_to_sunday)
 
-  # 計算第二個月的年月
-  m1_year, m1_month = st.session_state.view_year, st.session_state.view_month
-  if m1_month == 12:
-    m2_year, m2_month = m1_year + 1, 1
-  else:
-    m2_year, m2_month = m1_year, m1_month + 1
+  if "start_week_date" not in st.session_state:
+    st.session_state.start_week_date = current_sunday
 
-  # 月份切換控制列
+  # 導航控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
-  if c_prev.button("◀ 上個月", use_container_width=True):
-    if st.session_state.view_month == 1:
-      st.session_state.view_month = 12
-      st.session_state.view_year -= 1
-    else:
-      st.session_state.view_month -= 1
+  if c_prev.button("◀ 上一星期", use_container_width=True):
+    st.session_state.start_week_date -= timedelta(weeks=1)
     st.rerun()
 
+  end_date_display = st.session_state.start_week_date + timedelta(
+      days = (10 * 7) - 1
+  )
   c_title.markdown(
       f"<h3 style='text-align: center; margin: 0; color: #1e293b;'>"
-      f"{m1_year} 年 {m1_month} 月 & {m2_year} 年 {m2_month} 月</h3>",
+      f"{st.session_state.start_week_date.strftime('%Y/%m/%d')} ~"
+      f" {end_date_display.strftime('%Y/%m/%d')}</h3>",
       unsafe_allow_html=True,
   )
 
-  if c_next.button("下個月 ▶", use_container_width=True):
-    if st.session_state.view_month == 12:
-      st.session_state.view_month = 1
-      st.session_state.view_year += 1
-    else:
-      st.session_state.view_month += 1
+  if c_next.button("下一星期 ▶", use_container_width=True):
+    st.session_state.start_week_date += timedelta(weeks=1)
     st.rerun()
 
   st.write("")
 
-
-  # 渲染單個月份月曆的函式
-  def render_month_calendar(year, month):
-    st.markdown(
-        f"<h4 style='text-align: center; color: #334155; margin-top: 10px;"
-        f" margin-bottom: 8px;'>{year} 年 {month} 月</h4>",
+  # 顯示 7 列星期標題
+  week_days = ["日", "一", "二", "三", "四", "五", "六"]
+  header_cols = st.columns(7)
+  for i, day_name in enumerate(week_days):
+    header_cols[i].markdown(
+        f"<div style='font-weight: bold; text-align: center;"
+        f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
+        f" color: #334155; font-size: 12px;'>{day_name}</div>",
         unsafe_allow_html=True,
     )
 
-    # 顯示 7 列星期標題
-    week_days = ["日", "一", "二", "三", "四", "五", "六"]
-    header_cols = st.columns(7)
-    for i, day_name in enumerate(week_days):
-      header_cols[i].markdown(
-          f"<div style='font-weight: bold; text-align: center;"
-          f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
-          f" color: #334155; font-size: 12px;'>{day_name}</div>",
-          unsafe_allow_html=True,
+  color_emojis = {
+      "粉紅": "🌸",
+      "藍色": "🔷",
+      "紫色": "🟣",
+      "綠色": "🟢",
+      "黃色": "🟡",
+  }
+
+  # 連續渲染 10 個星期（每星期一行，共 10 行）
+  for w in range(10):
+    cols = st.columns(7)
+    for i in range(7):
+      current_d = st.session_state.start_week_date + timedelta(
+          days=(w * 7) + i
       )
+      day_events = schedule.get(current_d, [])
 
-    cal = calendar.Calendar(firstweekday=6)
-    month_matrix = cal.monthdayscalendar(year, month)
-    color_emojis = {
-        "粉紅": "🌸",
-        "藍色": "🔷",
-        "紫色": "🟣",
-        "綠色": "🟢",
-        "黃色": "🟡",
-    }
+      with cols[i]:
+        with st.container(border=True):
+          st.markdown(
+              f"<div style='font-size: 13px; font-weight: bold; color:"
+              f" #475569;'>{current_d.month}/{current_d.day}</div>",
+              unsafe_allow_html=True,
+          )
 
-    for week in month_matrix:
-      cols = st.columns(7)
-      for i, day in enumerate(week):
-        with cols[i]:
-          if day == 0:
-            with st.container(border=False):
-              st.write("")
-          else:
-            current_d = date(year, month, day)
-            day_events = schedule.get(current_d, [])
+          rendered_count = 0
+          if day_events:
+            for ev in day_events:
+              emoji = color_emojis.get(ev["color"], "📌")
+              c_txt, c_del = st.columns([6, 1])
+              with c_txt:
+                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+              with c_del:
+                if st.button(
+                    "✕", key=f"del_10w_{current_d.isoformat()}_{ev['item_id']}"
+                ):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
+              rendered_count += 1
 
-            with st.container(border=True):
-              st.markdown(f"**{day}**")
-
-              rendered_count = 0
-              if day_events:
-                for ev in day_events:
-                  emoji = color_emojis.get(ev["color"], "📌")
-                  c_txt, c_del = st.columns([6, 1])
-                  with c_txt:
-                    st.caption(f"{emoji} {ev['name']} ({ev['time']})")
-                  with c_del:
-                    if st.button("✕", key=f"del_{year}_{month}_{ev['item_id']}"):
-                      delete_schedule_db(ev["item_id"])
-                      st.rerun()
-                  rendered_count += 1
-
-              while rendered_count < 2:
-                st.caption(
-                    "<span"
-                    " style='opacity:0; user-select:none;'>-</span>",
-                    unsafe_allow_html=True,
-                )
-                rendered_count += 1
-
-
-  # 上下上下排列顯示兩個月份
-  render_month_calendar(m1_year, m1_month)
-  st.divider()
-  render_month_calendar(m2_year, m2_month)
+          while rendered_count < 2:
+            st.caption(
+                "<span style='opacity:0; user-select:none;'>-</span>",
+                unsafe_allow_html=True,
+            )
+            rendered_count += 1
