@@ -274,9 +274,7 @@ with col_left:
 with col_center:
   st.header("🗓️ 黎緊 10 個星期總覽")
 
-  # 預設第一行由今個星期開始（以本週星期日作為起始點，配合日曆星期日行頭）
   today = date.today()
-  #計算今個星期日 (Python weekday(): 0係星期一, 6係星期日)
   days_to_sunday = (today.weekday() + 1) % 7
   current_sunday = today - timedelta(days=days_to_sunday)
 
@@ -325,8 +323,25 @@ with col_center:
       "黃色": "🟡",
   }
 
+  last_month = None
+
   # 連續渲染 10 個星期（每星期一行，共 10 行）
   for w in range(10):
+    # 以每週的第一日（星期日）黎判斷呢個星期屬於邊個月份
+    week_start_date = st.session_state.start_week_date + timedelta(days=w * 7)
+    current_month = week_start_date.month
+
+    # 如果跨咗新月份，自動加一個優雅嘅月份分隔標題
+    if last_month is not None and current_month != last_month:
+      st.markdown(
+          f"<div style='text-align: center; font-weight: bold; color:"
+          f" #0284c7; background-color: #f0f9ff; padding: 4px; border-radius:"
+          f" 4px; margin: 12px 0 8px 0; font-size: 13px;'>── 🌸 {week_start_date.year}"
+          f" 年 {current_month} 月 ──</div>",
+          unsafe_allow_html=True,
+      )
+    last_month = current_month
+
     cols = st.columns(7)
     for i in range(7):
       current_d = st.session_state.start_week_date + timedelta(
