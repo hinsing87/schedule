@@ -6,38 +6,6 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS 打造傳統月曆網格與靚仔顏色標籤
-st.markdown(
-    """
-    <style>
-    .calendar-box {
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 10px;
-        min-height: 140px;
-        background-color: #ffffff;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .calendar-header {
-        font-weight: bold;
-        text-align: center;
-        background-color: #f1f5f9;
-        padding: 8px;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        color: #334155;
-    }
-    .day-num {
-        font-size: 15px;
-        font-weight: bold;
-        color: #1e293b;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -164,13 +132,13 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
-# 顏色對應的 CSS 樣式
-color_map = {
-    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;",
-    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;",
-    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;",
-    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;",
-    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a;",
+# 顏色對應的標籤 style
+color_styles = {
+    "粉紅": "background-color: #fce7f3; color: #9d174d; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
+    "綠色": "background-color: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
+    "黃色": "background-color: #fefce8; color: #854d0e; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; font-size: 12px;",
 }
 
 activities = get_activities()
@@ -183,8 +151,8 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
-# --- 版面配置：左邊設定活動，中間主力放大月曆 ---
-col_left, col_center = st.columns([1, 2.5], gap="large")
+# --- 版面配置：左邊設定，中間大月曆 ---
+col_left, col_center = st.columns([1, 2.8], gap="large")
 
 with col_left:
   st.header("⚙️ 活動設定與排程")
@@ -301,8 +269,10 @@ with col_center:
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
   header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
-    header_cols[i].markdown(
-        f"<div class='calendar-header'>{day_name}</div>",
+    header_cols[i.item() if hasattr(i, 'item') else i].markdown(
+        f"<div style='text-align: center; font-weight: bold; background-color:"
+        f" #f1f5f9; padding: 6px; border-radius: 4px; color:"
+        f" #334155;'>{day_name}</div>",
         unsafe_allow_html=True,
     )
 
@@ -312,14 +282,16 @@ with col_center:
       st.session_state.view_year, st.session_state.view_month
   )
 
-  # 渲染月曆格子
+  # 渲染月曆格子（每一行代表一星期）
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
+          # 空白格
           st.markdown(
-              "<div class='calendar-box' style='background-color: #f8fafc;"
+              "<div style='border: 1px solid #e2e8f0; border-radius: 8px;"
+              " padding: 6px; min-height: 120px; background-color: #f8fafc;"
               " opacity: 0.3;'></div>",
               unsafe_allow_html=True,
           )
@@ -329,25 +301,22 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 先顯示日期數字
-          st.markdown(
-              f"<div class='calendar-box'><span class='day-num'>{day}</span>",
-              unsafe_allow_html=True,
-          )
+          # 用 Streamlit 容器代替純 HTML 框，確保所有活動同刪除掣完美鎖死喺個格仔入面
+          with st.container(border=True):
+            st.markdown(f"**{day}**")
 
-          # 獨立渲染每個活動標籤及刪除按鈕，避免 HTML 衝突
-          for ev in day_events:
-            c_style = color_map.get(ev["color"], color_map["藍色"])
-            st.markdown(
-                f"<div style='{c_style}; font-size: 11px; padding: 2px 6px;"
-                f" border-radius: 4px; margin-top: 4px;'><b>{ev['name']}</b>"
-                f" ({ev['time']})</div>",
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "❌ 刪除", key=f"del_{ev['item_id']}", use_container_width=True
-            ):
-              delete_schedule_db(ev["item_id"])
-              st.rerun()
-
-          st.markdown("</div>", unsafe_allow_html=True)
+            if day_events:
+              for ev in day_events:
+                style_str = color_styles.get(ev["color"], color_styles["藍色"])
+                st.markdown(
+                    f"<div style='{style_str}'><b>{ev['name']}</b><br>⏰"
+                    f" {ev['time']}</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "❌ 刪除",
+                    key=f"del_{ev['item_id']}",
+                    use_container_width=True,
+                ):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
