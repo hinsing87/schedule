@@ -6,75 +6,6 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：確保所有活動卡片同刪除按鈕絕對貼死在月曆格子內
-st.markdown(
-    """
-    <style>
-    .calendar-header {
-        font-weight: bold;
-        text-align: center;
-        background-color: #f1f5f9;
-        padding: 8px;
-        border-radius: 6px;
-        color: #334155;
-        font-size: 13px;
-        margin-bottom: 8px;
-    }
-    .calendar-box {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 8px;
-        min-height: 150px;
-        background-color: #ffffff;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-        display: flex;
-        flex-direction: column;
-        box-sizing: border-box;
-    }
-    .calendar-box-empty {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 8px;
-        min-height: 150px;
-        background-color: #f8fafc;
-        opacity: 0.3;
-        box-sizing: border-box;
-    }
-    .day-num {
-        font-size: 14px;
-        font-weight: bold;
-        color: #1e293b;
-        margin-bottom: 6px;
-    }
-    /* 活動卡片連刪除按鈕：使用 flexbox 完美內嵌在格子內 */
-    .event-card {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 6px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        margin-bottom: 4px;
-        box-sizing: border-box;
-    }
-    .event-info {
-        line-height: 1.2;
-    }
-    .event-delete-btn {
-        background: none;
-        border: none;
-        font-weight: bold;
-        font-size: 14px;
-        cursor: pointer;
-        padding: 0 2px;
-        text-decoration: none;
-        line-height: 1;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
 
 # --- 初始化 SQLite 資料庫 ---
 def init_db():
@@ -201,35 +132,6 @@ def delete_schedule_db(item_id):
   conn.close()
 
 
-# 顏色對應樣式配置 (卡片樣式, 文字顏色)
-color_styles = {
-    "粉紅": (
-        "background-color: #fce7f3; color: #9d174d; border: 1px solid"
-        " #fbcfe8;",
-        "#db2777",
-    ),
-    "藍色": (
-        "background-color: #eff6ff; color: #1e40af; border: 1px solid"
-        " #bfdbfe;",
-        "#3b82f6",
-    ),
-    "紫色": (
-        "background-color: #f3e8ff; color: #6b21a8; border: 1px solid"
-        " #e9d5ff;",
-        "#9333ea",
-    ),
-    "綠色": (
-        "background-color: #f0fdf4; color: #166534; border: 1px solid"
-        " #bbf7d0;",
-        "#16a34a",
-    ),
-    "黃色": (
-        "background-color: #fefce8; color: #854d0e; border: 1px solid"
-        " #fef08a;",
-        "#ca8a04",
-    ),
-}
-
 activities = get_activities()
 if not activities:
   add_activity_db(str(uuid.uuid4())[:8], "鋼琴班", "16:00", "粉紅")
@@ -327,14 +229,6 @@ with col_center:
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
-  # 處理主頁面中的網址參數刪除動作（絕對不會變成頁中頁）
-  query_params = st.query_params
-  if "delete_item" in query_params:
-    del_id = query_params["delete_item"]
-    delete_schedule_db(del_id)
-    st.query_params.clear()
-    st.rerun()
-
   # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
@@ -367,7 +261,9 @@ with col_center:
   header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
     header_cols[i].markdown(
-        f"<div class='calendar-header'>{day_name}</div>",
+        f"<div style='font-weight: bold; text-align: center;"
+        f" background-color: #f1f5f9; padding: 8px; border-radius: 6px;"
+        f" color: #334155; font-size: 13px;'>{day_name}</div>",
         unsafe_allow_html=True,
     )
 
@@ -377,41 +273,38 @@ with col_center:
       st.session_state.view_year, st.session_state.view_month
   )
 
-  # 渲染月曆格子：直接在單一 st.markdown 內組合所有 HTML，確保 100% 鎖死在格子入面
+  # 顏色對應的簡單 Emoji 或標示
+  color_emojis = {
+      "粉紅": "🌸",
+      "藍色": "🔷",
+      "紫色": "🟣",
+      "綠色": "🟢",
+      "黃色": "🟡",
+  }
+
+  # 渲染月曆格子 (完全使用 Streamlit 原生 st.container(border=True))
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          st.markdown(
-              "<div class='calendar-box-empty'></div>", unsafe_allow_html=True
-          )
+          # 空白格
+          with st.container(border=False):
+            st.write("")
         else:
           current_d = date(
               st.session_state.view_year, st.session_state.view_month, day
           )
           day_events = schedule.get(current_d, [])
 
-          # 組合當日所有活動卡片（包含內嵌的 ✕ 按鈕）
-          events_html = ""
-          for ev in day_events:
-            card_style, x_color = color_styles.get(
-                ev["color"], color_styles["藍色"]
-            )
-            events_html += f"""
-                    <div class="event-card" style="{card_style}">
-                        <div class="event-info"><b>{ev['name']}</b><br>{ev['time']}</div>
-                        <a href="?delete_item={ev['item_id']}" class="event-delete-btn" style="color: {x_color};" title="刪除">✕</a>
-                    </div>
-                    """
+          # 用原生有框容器代表每一日
+          with st.container(border=True):
+            st.markdown(f"**{day}**")
 
-          # 完美包裝在 calendar-box 裡面，絕不外露
-          st.markdown(
-              f"""
-                <div class="calendar-box">
-                    <div class="day-num">{day}</div>
-                    {events_html}
-                </div>
-                """,
-              unsafe_allow_html=True,
-          )
+            if day_events:
+              for ev in day_events:
+                emoji = color_emojis.get(ev["color"], "📌")
+                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+                if st.button("刪除", key=f"del_{ev['item_id']}"):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
