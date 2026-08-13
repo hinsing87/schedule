@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：使用純 CSS 控制月曆格高度 (180px)，確保兩行活動加刪除按鈕極之鬆動、絕不貼底
+# 自訂 CSS：使用純 HTML 內部排版，確保所有活動同刪除掣完美鎖死在月曆格之內，絕不跌出
 st.markdown(
     """
     <style>
@@ -21,6 +21,7 @@ st.markdown(
         flex-direction: column;
         justify-content: flex-start;
         margin-bottom: 10px;
+        overflow: hidden;
     }
     .calendar-box-empty {
         border: none;
@@ -33,6 +34,17 @@ st.markdown(
         margin-bottom: 6px;
         font-size: 15px;
     }
+    .event-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        color: #475569;
+        margin-bottom: 4px;
+        background-color: #f8fafc;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
     
     /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
     button[kind="secondary"] {
@@ -41,10 +53,11 @@ st.markdown(
         box-shadow: none !important;
         color: #ef4444 !important;
         font-weight: bold !important;
-        font-size: 14px !important;
+        font-size: 13px !important;
         padding: 0px !important;
         min-height: unset !important;
-        height: 22px !important;
+        height: 20px !important;
+        width: 20px !important;
     }
     button[kind="secondary"]:hover {
         background-color: #fee2e2 !important;
@@ -244,7 +257,7 @@ with col_left:
 
   st.divider()
 
-  # 2. 新增活動種類
+  # 2. 新зов活動種類
   with st.expander("＋ 新增活動種類", expanded=False):
     act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
     act_time = st.text_input("時間 (例如: 16:00)")
@@ -331,7 +344,7 @@ with col_center:
       "黃色": "🟡",
   }
 
-  # 渲染月曆格子（改用純 HTML 外框，確保高度絕對受控）
+  # 渲染月曆格子
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
@@ -346,20 +359,31 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          st.markdown(
-              f"<div class='calendar-box'><div"
-              f" class='day-number'>{day}</div></div>",
-              unsafe_allow_html=True,
-          )
-
-          # 在格內渲染活動與刪除按鈕
+          # 組合該日所有活動的 HTML 內容，把刪除掣完美嵌在同一行
+          events_html = ""
           if day_events:
             for ev in day_events:
               emoji = color_emojis.get(ev["color"], "📌")
-              c_txt, c_del = st.columns([5, 1])
-              with c_txt:
-                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
-              with c_del:
-                if st.button("✕", key=f"del_{ev['item_id']}"):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
+              # 我們用一個 placeholder 來放按鈕
+              events_html += (
+                  f"<div class='event-row'><span>{emoji} {ev['name']}"
+                  f" ({ev['time']})</span></div>"
+              )
+
+          st.markdown(
+              f"""
+                    <div class='calendar-box'>
+                        <div class='day-number'>{day}</div>
+                        {events_html}
+                    </div>
+                    """,
+              unsafe_allow_html=True,
+          )
+
+          # 在 Streamlit 獨立迴圈中精準對應渲染刪除按鈕
+          if day_events:
+            for ev in day_events:
+              # 利用小行排版讓按鈕緊貼在對應位置
+              if st.button("✕", key=f"del_{ev['item_id']}"):
+                delete_schedule_db(ev["item_id"])
+                st.rerun()
