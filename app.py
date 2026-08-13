@@ -6,18 +6,32 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：精準控制月曆格子高度與內部 Padding，徹底解決貼底問題
+# 自訂 CSS：使用純 CSS 控制月曆格高度 (180px)，確保兩行活動加刪除按鈕極之鬆動、絕不貼底
 st.markdown(
     """
     <style>
-    /* 將月曆格子高度提升到 175px，並縮減內部上下 padding 確保活動足夠鬆動 */
-    [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 175px;
+    .calendar-box {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background-color: #ffffff;
+        height: 180px;
+        padding: 10px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        margin-bottom: 10px;
     }
-    
-    [data-testid="stContainer"] {
-        padding-top: 4px !important;
-        padding-bottom: 4px !important;
+    .calendar-box-empty {
+        border: none;
+        background-color: transparent;
+        height: 180px;
+    }
+    .day-number {
+        font-weight: bold;
+        color: #1e293b;
+        margin-bottom: 6px;
+        font-size: 15px;
     }
     
     /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
@@ -30,7 +44,7 @@ st.markdown(
         font-size: 14px !important;
         padding: 0px !important;
         min-height: unset !important;
-        height: 24px !important;
+        height: 22px !important;
     }
     button[kind="secondary"]:hover {
         background-color: #fee2e2 !important;
@@ -317,40 +331,35 @@ with col_center:
       "黃色": "🟡",
   }
 
-  # 渲染月曆格子
+  # 渲染月曆格子（改用純 HTML 外框，確保高度絕對受控）
   for week in month_matrix:
     cols = st.columns(7)
     for i, day in enumerate(week):
       with cols[i]:
         if day == 0:
-          with st.container(border=False):
-            st.write("")
+          st.markdown(
+              "<div class='calendar-box-empty'></div>", unsafe_allow_html=True
+          )
         else:
           current_d = date(
               st.session_state.view_year, st.session_state.view_month, day
           )
           day_events = schedule.get(current_d, [])
 
-          with st.container(border=True):
-            st.markdown(f"**{day}**")
+          st.markdown(
+              f"<div class='calendar-box'><div"
+              f" class='day-number'>{day}</div></div>",
+              unsafe_allow_html=True,
+          )
 
-            rendered_count = 0
-            if day_events:
-              for ev in day_events:
-                emoji = color_emojis.get(ev["color"], "📌")
-                c_txt, c_del = st.columns([6, 1])
-                with c_txt:
-                  st.caption(f"{emoji} {ev['name']} ({ev['time']})")
-                with c_del:
-                  if st.button("✕", key=f"del_{ev['item_id']}"):
-                    delete_schedule_db(ev["item_id"])
-                    st.rerun()
-                rendered_count += 1
-
-            while rendered_count < 2:
-              st.caption(
-                  "<span"
-                  " style='opacity:0; user-select:none;'>-</span>",
-                  unsafe_allow_html=True,
-              )
-              rendered_count += 1
+          # 在格內渲染活動與刪除按鈕
+          if day_events:
+            for ev in day_events:
+              emoji = color_emojis.get(ev["color"], "📌")
+              c_txt, c_del = st.columns([5, 1])
+              with c_txt:
+                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+              with c_del:
+                if st.button("✕", key=f"del_{ev['item_id']}"):
+                  delete_schedule_db(ev["item_id"])
+                  st.rerun()
