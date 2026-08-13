@@ -80,11 +80,12 @@ with col2:
         # 用 expander 打造乾淨嘅日曆卡片風格
         with st.expander(f"📌 {d.strftime('%Y-%m-%d (%A)')} ({len(items)} 堂)", expanded=True):
           for idx, item in enumerate(items):
+            # 修正欄位分配：cols[0] 放文字，cols[1] 放刪除按鈕
             cols = st.columns([3, 1])
-            cols.markdown(f"**{item['name']}** — ⏰ `{item['time']}`")
+            cols[0].markdown(f"**{item['name']}** — ⏰ `{item['time']}`")
             
             # 一鍵刪除當日單一活動
-            if cols.button("🗑️ 刪除", key=f"del_{d}_{idx}"):
+            if cols[1].button("🗑️ 刪除", key=f"del_{d}_{idx}"):
               st.session_state.schedule[d].pop(idx)
               # 如果該日已經無晒活動，順便清空個 key
               if not st.session_state.schedule[d]:
