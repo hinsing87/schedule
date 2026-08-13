@@ -6,11 +6,10 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：強制光亮模式背景、並利用 Media Query 自動切換電腦版/手機版
+# 自訂 CSS：強制光亮模式背景及精緻刪除按鈕
 st.markdown(
     """
     <style>
-    /* 強制全站保持光亮背景，避免手機深色模式變黑影響閱讀 */
     :root {
         color-scheme: light;
     }
@@ -35,16 +34,6 @@ st.markdown(
         background-color: #fee2e2 !important;
         color: #991b1b !important;
         border-radius: 4px !important;
-    }
-
-    /* 預設隱藏手機版容器，顯示電腦版 */
-    .mobile-view { display: none; }
-    .desktop-view { display: block; }
-
-    /* 當畫面寬度小於 768px (即手機) 時：自動隱藏電腦版月曆，顯示手機版清單 */
-    @media (max-width: 768px) {
-        .desktop-view { display: none !important; }
-        .mobile-view { display: block !important; }
     }
     </style>
 """,
@@ -186,6 +175,27 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
+# --- 自動偵測是否為手機版 (透過 Streamlit Header User-Agent) ---
+headers = st.context.headers
+ua = headers.get("User-Agent", "").lower() if headers else ""
+is_mobile = any(
+    device in ua for device in ["iphone", "android", "ipad", "mobile"]
+)
+
+# 亦可提供手動切換開關 (放在側邊欄或頂部以防萬一)
+with st.sidebar:
+  st.header("⚙️ 顯示設定")
+  override_mode = st.radio(
+      "裝置模式選擇",
+      ["自動偵測", "強制電腦版月曆", "強制手機版清單"],
+      index=0,
+  )
+
+if override_mode == "強制手機版清單":
+  is_mobile = True
+elif override_mode == "強制電腦版月曆":
+  is_mobile = False
+
 col_calendar, col_setting = st.columns([3.2, 1], gap="large")
 
 with col_calendar:
@@ -229,136 +239,134 @@ with col_calendar:
   }
 
   # ==========================================
-  # 1. 電腦版畫面 (寬螢幕自動顯示)
+  # A. 手機版：上下清單檢視 (當偵測到手機時執行)
   # ==========================================
-  st.markdown('<div class="desktop-view">', unsafe_allow_html=True)
-  st.header("🗓️ 黎緊 10 個星期總覽 (月曆)")
-  week_days = ["日", "一", "二", "三", "四", "五", "六"]
+  if is_mobile:
+    st.header("📋 黎緊 10 個星期活動清單 (手機專用)")
+    weekdays_zh = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
 
-  h_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
-  h_cols[0].markdown(
-      "<div style='font-weight: bold; text-align: center; background-color:"
-      " #e2e8f0; padding: 6px 2px; border-radius: 4px; color: #334155; font-size:"
-      " 11px;'>月份</div>",
-      unsafe_allow_html=True,
-  )
-  for idx, d_name in enumerate(week_days):
-    h_cols[idx + 1].markdown(
-        f"<div style='font-weight: bold; text-align: center;"
-        f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
-        f" color: #334155; font-size: 12px;'>{d_name}</div>",
-        unsafe_allow_html=True,
-    )
+    for w in range(10):
+      week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
+      st.markdown(
+          f"<h4 style='color: #0284c7; margin-top: 15px; font-size:"
+          f" 14px;'>── 星期 ({week_start_d.strftime('%Y/%m/%d')} 起) ──</h4>",
+          unsafe_allow_html=True,
+      )
 
-  last_month = None
-  for w in range(10):
-    week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
-    current_month = (week_start_d + timedelta(days=4)).month
-    row_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
+      for i in range(7):
+        current_d = week_start_d + timedelta(days=i)
+        day_events = schedule.get(current_d, [])
+        w_day_name = weekdays_zh[current_d.weekday() % 7]
 
-    with row_cols[0]:
-      if current_month != last_month:
-        st.markdown(
-            f"<div style='min-height: 90px; display: flex; flex-direction:"
-            f" column; align-items: center; justify-content: center; font-weight:"
-            f" bold; color: #0284c7; background-color: #f0f9ff; border-left:"
-            f" 3px solid #0284c7; border-radius: 4px; font-size: 12px; text-align:"
-            f" center;'>🌸<br>{current_month}月</div>",
-            unsafe_allow_html=True,
-        )
-        last_month = current_month
-      else:
-        st.markdown(
-            "<div style='min-height: 90px; border-left: 3px solid #e0f2fe;'>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    for i in range(7):
-      current_d = week_start_d + timedelta(days=i)
-      day_events = schedule.get(current_d, [])
-      with row_cols[i + 1]:
         with st.container(border=True):
-          st.markdown(
-              f"<div style='font-size: 11px; font-weight: bold; color:"
-              f" #475569;'>{current_d.month}/{current_d.day}</div>",
-              unsafe_allow_html=True,
-          )
-          rendered_count = 0
-          if day_events:
-            for ev in day_events:
-              emoji = color_emojis.get(ev["color"], "📌")
-              c_txt, c_del = st.columns([5, 1])
-              with c_txt:
-                st.caption(f"{emoji} {ev['name']} ({ev['time']})")
-              with c_del:
-                if st.button(
-                    "✕", key=f"del_d_{current_d.isoformat()}_{ev['item_id']}"
-                ):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
-              rendered_count += 1
-          while rendered_count < 2:
-            st.caption(
-                "<span style='opacity:0; user-select:none;'>-</span>",
+          col_d_info, col_d_act = st.columns([1.2, 3])
+          with col_d_info:
+            is_today = "🔥 " if current_d == date.today() else ""
+            st.markdown(
+                f"<div style='font-size: 13px; font-weight: bold; color:"
+                f" #1e293b;'>{is_today}{current_d.strftime('%m/%d')} ({w_day_name})</div>",
                 unsafe_allow_html=True,
             )
-            rendered_count += 1
-  st.markdown("</div>", unsafe_allow_html=True)
+
+          with col_d_act:
+            if day_events:
+              for ev in day_events:
+                emoji = color_emojis.get(ev["color"], "📌")
+                c_t, c_d = st.columns([4, 1])
+                with c_t:
+                  st.markdown(
+                      f"<span style='font-size: 13px; color: #1e293b;'>{emoji}"
+                      f" <b>{ev['name']}</b> ({ev['time']})</span>",
+                      unsafe_allow_html=True,
+                  )
+                with c_d:
+                  if st.button(
+                      "✕", key=f"del_m_{current_d.isoformat()}_{ev['item_id']}"
+                  ):
+                    delete_schedule_db(ev["item_id"])
+                    st.rerun()
+            else:
+              st.markdown(
+                  "<span style='color: #94a3b8; font-size: 12px;'>（無活動）</span>",
+                  unsafe_allow_html=True,
+              )
 
   # ==========================================
-  # 2. 手機版畫面 (細螢幕自動顯示上下清單)
+  # B. 電腦版：橫向月曆檢視 (當偵測到電腦時執行)
   # ==========================================
-  st.markdown('<div class="mobile-view">', unsafe_allow_html=True)
-  st.header("📋 活動清單 (手機專用)")
-  weekdays_zh = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
+  else:
+    st.header("🗓️ 黎緊 10 個星期總覽 (月曆)")
+    week_days = ["日", "一", "二", "三", "四", "五", "六"]
 
-  for w in range(10):
-    week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
-    st.markdown(
-        f"<h4 style='color: #0284c7; margin-top: 15px; font-size:"
-        f" 14px;'>── 星期 ({week_start_d.strftime('%Y/%m/%d')} 起) ──</h4>",
+    h_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
+    h_cols[0].markdown(
+        "<div style='font-weight: bold; text-align: center; background-color:"
+        " #e2e8f0; padding: 6px 2px; border-radius: 4px; color: #334155; font-size:"
+        " 11px;'>月份</div>",
         unsafe_allow_html=True,
     )
+    for idx, d_name in enumerate(week_days):
+      h_cols[idx + 1].markdown(
+          f"<div style='font-weight: bold; text-align: center;"
+          f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
+          f" color: #334155; font-size: 12px;'>{d_name}</div>",
+          unsafe_allow_html=True,
+      )
 
-    for i in range(7):
-      current_d = week_start_d + timedelta(days=i)
-      day_events = schedule.get(current_d, [])
-      w_day_name = weekdays_zh[current_d.weekday() % 7]
+    last_month = None
+    for w in range(10):
+      week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
+      current_month = (week_start_d + timedelta(days=4)).month
+      row_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
 
-      with st.container(border=True):
-        col_d_info, col_d_act = st.columns([1.2, 3])
-        with col_d_info:
-          is_today = "🔥 " if current_d == date.today() else ""
+      with row_cols[0]:
+        if current_month != last_month:
           st.markdown(
-              f"<div style='font-size: 13px; font-weight: bold; color:"
-              f" #1e293b;'>{is_today}{current_d.strftime('%m/%d')} ({w_day_name})</div>",
+              f"<div style='min-height: 90px; display: flex; flex-direction:"
+              f" column; align-items: center; justify-content: center; font-weight:"
+              f" bold; color: #0284c7; background-color: #f0f9ff; border-left:"
+              f" 3px solid #0284c7; border-radius: 4px; font-size: 12px; text-align:"
+              f" center;'>🌸<br>{current_month}月</div>",
+              unsafe_allow_html=True,
+          )
+          last_month = current_month
+        else:
+          st.markdown(
+              "<div style='min-height: 90px; border-left: 3px solid #e0f2fe;'>"
+              "</div>",
               unsafe_allow_html=True,
           )
 
-        with col_d_act:
-          if day_events:
-            for ev in day_events:
-              emoji = color_emojis.get(ev["color"], "📌")
-              c_t, c_d = st.columns([4, 1])
-              with c_t:
-                st.markdown(
-                    f"<span style='font-size: 13px; color: #1e293b;'>{emoji}"
-                    f" <b>{ev['name']}</b> ({ev['time']})</span>",
-                    unsafe_allow_html=True,
-                )
-              with c_d:
-                if st.button(
-                    "✕", key=f"del_m_{current_d.isoformat()}_{ev['item_id']}"
-                ):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
-          else:
+      for i in range(7):
+        current_d = week_start_d + timedelta(days=i)
+        day_events = schedule.get(current_d, [])
+        with row_cols[i + 1]:
+          with st.container(border=True):
             st.markdown(
-                "<span style='color: #94a3b8; font-size: 12px;'>（無活動）</span>",
+                f"<div style='font-size: 11px; font-weight: bold; color:"
+                f" #475569;'>{current_d.month}/{current_d.day}</div>",
                 unsafe_allow_html=True,
             )
-  st.markdown("</div>", unsafe_allow_html=True)
+            rendered_count = 0
+            if day_events:
+              for ev in day_events:
+                emoji = color_emojis.get(ev["color"], "📌")
+                c_txt, c_del = st.columns([5, 1])
+                with c_txt:
+                  st.caption(f"{emoji} {ev['name']} ({ev['time']})")
+                with c_del:
+                  if st.button(
+                      "✕", key=f"del_d_{current_d.isoformat()}_{ev['item_id']}"
+                  ):
+                    delete_schedule_db(ev["item_id"])
+                    st.rerun()
+                rendered_count += 1
+            while rendered_count < 2:
+              st.caption(
+                  "<span style='opacity:0; user-select:none;'>-</span>",
+                  unsafe_allow_html=True,
+              )
+              rendered_count += 1
 
 with col_setting:
   st.header("⚙️ 設定與排程")
