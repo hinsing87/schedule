@@ -304,11 +304,17 @@ with col_center:
 
   st.write("")
 
-  # 顯示 7 列星期標題
+  # 顯示標題列：左邊加多一欄放「月份」，右邊 7 列放星期
+  header_cols = st.columns([0.8, 1, 1, 1, 1, 1, 1, 1])
+  header_cols[0].markdown(
+      "<div style='font-weight: bold; text-align: center;"
+      " background-color: #e2e8f0; padding: 6px; border-radius: 4px;"
+      " color: #334155; font-size: 12px;'>月份</div>",
+      unsafe_allow_html=True,
+  )
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
-  header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
-    header_cols[i].markdown(
+    header_cols[i + 1].markdown(
         f"<div style='font-weight: bold; text-align: center;"
         f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
         f" color: #334155; font-size: 12px;'>{day_name}</div>",
@@ -325,34 +331,42 @@ with col_center:
 
   last_month = None
 
-  # 連續渲染 10 個星期（每星期一行，共 10 行）
+  # 連續渲染 10 個星期（每星期一行）
   for w in range(10):
-    # 統計該週 7 日入面，邊個月份佔嘅日子最多（或者以該週星期四所屬嘅月份作準，最符合會計/日曆慣例）
-    week_thursday = st.session_state.start_week_date + timedelta(
-        days=(w * 7) + 4
-    )
+    week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
+    week_end_d = week_start_d + timedelta(days=6)
+
+    # 判斷呢個星期屬於邊個月份（以星期四為代表）
+    week_thursday = week_start_d + timedelta(days=4)
     current_month = week_thursday.month
     current_year = week_thursday.year
 
-    # 如果跨咗新月份，自動加一個優雅嘅月份分隔標題
-    if last_month is not None and current_month != last_month:
-      st.markdown(
-          f"<div style='text-align: center; font-weight: bold; color:"
-          f" #0284c7; background-color: #f0f9ff; padding: 4px; border-radius:"
-          f" 4px; margin: 12px 0 8px 0; font-size: 13px;'>── 🌸"
-          f" {current_year} 年 {current_month} 月 ──</div>",
-          unsafe_allow_html=True,
-      )
-    last_month = current_month
+    # 建立包含左邊月份欄同 7 日嘅行
+    row_cols = st.columns([0.8, 1, 1, 1, 1, 1, 1, 1])
 
-    cols = st.columns(7)
+    # 左邊顯示月份標籤（如果換咗月份或者第一行，就顯示出嚟）
+    with row_cols[0]:
+      if current_month != last_month:
+        st.markdown(
+            f"<div style='height: 100%; display: flex; align-items: center;"
+            f" justify-content: center; font-weight: bold; color: #0284c7;"
+            f" background-color: #f0f9ff; border-radius: 4px; font-size:"
+            f" 13px; text-align: center; padding: 10px 2px;'>🌸<br>{current_month}月</div>",
+            unsafe_allow_html=True,
+        )
+        last_month = current_month
+      else:
+        # 同一個月份就留空或者顯示簡化格
+        st.markdown(
+            "<div style='min-height: 150px;'></div>", unsafe_allow_html=True
+        )
+
+    # 渲染 7 日嘅格仔
     for i in range(7):
-      current_d = st.session_state.start_week_date + timedelta(
-          days=(w * 7) + i
-      )
+      current_d = week_start_d + timedelta(days=i)
       day_events = schedule.get(current_d, [])
 
-      with cols[i]:
+      with row_cols[i + 1]:
         with st.container(border=True):
           st.markdown(
               f"<div style='font-size: 13px; font-weight: bold; color:"
