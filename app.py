@@ -14,7 +14,7 @@ st.markdown(
         border: 1px solid #e2e8f0;
         border-radius: 10px;
         padding: 10px;
-        min-height: 130px;
+        min-height: 140px;
         background-color: #ffffff;
         margin-bottom: 10px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
@@ -75,7 +75,6 @@ init_db()
 def get_activities():
   conn = sqlite3.connect("schedule.db")
   c = conn.cursor()
-  # 兼容舊資料庫欄位
   try:
     c.execute("SELECT act_id, name, time, color FROM activities")
   except sqlite3.OperationalError:
@@ -265,13 +264,13 @@ with col_left:
 with col_center:
   st.header("🗓️ 月曆總覽")
 
-  # 處理 Session State 中的年月切換（透過箭咀按鈕）
+  # 處理 Session State 中的年月切換
   if "view_year" not in st.session_state:
     st.session_state.view_year = date.today().year
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
-  # 月份切換控制列（箭咀與標題）
+  # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
   if c_prev.button("◀ 上個月", use_container_width=True):
@@ -296,7 +295,7 @@ with col_center:
       st.session_state.view_month += 1
     st.rerun()
 
-  st.write("")  # 隔開少許空間
+  st.write("")
 
   # 顯示 7 列星期標題
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
@@ -330,33 +329,25 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 組合該日的活動標籤與直接刪除按鈕
-          events_html = ""
-          for ev in day_events:
-            c_style = color_map.get(ev["color"], color_map["藍色"])
-            events_html += f"""
-                        <div style='{c_style}; font-size: 11px; padding: 3px 6px; border-radius: 6px; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;'>
-                            <span><b>{ev['name']}</b> ({ev['time']})</span>
-                        </div>
-                        """
-
+          # 先顯示日期數字
           st.markdown(
-              f"""
-                    <div class='calendar-box'>
-                        <span class='day-num'>{day}</span>
-                        {events_html}
-                    </div>
-                    """,
+              f"<div class='calendar-box'><span class='day-num'>{day}</span>",
               unsafe_allow_html=True,
           )
 
-          # 直接在月曆格子下方為每個活動提供刪除按鈕
-          if day_events:
-            for ev in day_events:
-              if st.button(
-                  f"❌ {ev['name']} ({ev['time']})",
-                  key=f"cal_del_{ev['item_id']}",
-                  use_container_width=True,
-              ):
-                delete_schedule_db(ev["item_id"])
-                st.rerun()
+          # 獨立渲染每個活動標籤及刪除按鈕，避免 HTML 衝突
+          for ev in day_events:
+            c_style = color_map.get(ev["color"], color_map["藍色"])
+            st.markdown(
+                f"<div style='{c_style}; font-size: 11px; padding: 2px 6px;"
+                f" border-radius: 4px; margin-top: 4px;'><b>{ev['name']}</b>"
+                f" ({ev['time']})</div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(
+                "❌ 刪除", key=f"del_{ev['item_id']}", use_container_width=True
+            ):
+              delete_schedule_db(ev["item_id"])
+              st.rerun()
+
+          st.markdown("</div>", unsafe_allow_html=True)
