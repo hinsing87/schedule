@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：確保同一星期格子高度一致，並修飾活動標籤外觀
+# 自訂 CSS 打造完美月曆網格，確保同一星期高度一致
 st.markdown(
     """
     <style>
@@ -14,7 +14,7 @@ st.markdown(
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 8px;
-        min-height: 140px;
+        min-height: 150px;
         background-color: #ffffff;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         display: flex;
@@ -24,7 +24,7 @@ st.markdown(
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 8px;
-        min-height: 140px;
+        min-height: 150px;
         background-color: #f8fafc;
         opacity: 0.3;
     }
@@ -41,7 +41,17 @@ st.markdown(
         font-size: 14px;
         font-weight: bold;
         color: #1e293b;
+        margin-bottom: 6px;
+    }
+    /* 活動項目的外觀樣式 */
+    .event-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 6px;
+        border-radius: 6px;
         margin-bottom: 4px;
+        font-size: 11px;
     }
     </style>
 """,
@@ -176,11 +186,11 @@ def delete_schedule_db(item_id):
 
 # 顏色對應嘅 CSS 樣式
 color_styles = {
-    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8; padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 2px;",
-    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 2px;",
-    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 2px;",
-    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 2px;",
-    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a; padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-bottom: 2px;",
+    "粉紅": "background-color: #fce7f3; color: #9d174d; border: 1px solid #fbcfe8;",
+    "藍色": "background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;",
+    "紫色": "background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff;",
+    "綠色": "background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;",
+    "黃色": "background-color: #fefce8; color: #854d0e; border: 1px solid #fef08a;",
 }
 
 activities = get_activities()
@@ -280,6 +290,14 @@ with col_center:
   if "view_month" not in st.session_state:
     st.session_state.view_month = date.today().month
 
+  # 檢查網址參數是否有刪除動作（透過輕量 Query Params 達成完美右側刪除按鈕）
+  query_params = st.query_params
+  if "delete_item" in query_params:
+    del_id = query_params["delete_item"]
+    delete_schedule_db(del_id)
+    st.query_params.clear()
+    st.rerun()
+
   # 月份切換控制列
   c_prev, c_title, c_next = st.columns([1, 4, 1])
 
@@ -337,29 +355,24 @@ with col_center:
           )
           day_events = schedule.get(current_d, [])
 
-          # 渲染日期數字
+          # 組合活動標籤與右側精緻刪除按鈕 (✕)
+          events_html = ""
+          for ev in day_events:
+            c_style = color_styles.get(ev["color"], color_styles["藍色"])
+            # 透過超連結呼叫網址參數觸發刪除，完美貼在活動右側且不佔位、不走位
+            events_html += f"""
+                    <div class='event-item' style='{c_style}'>
+                        <span><b>{ev['name']}</b> ({ev['time']})</span>
+                        <a href='?delete_item={ev['item_id']}' style='color: #94a3b8; text-decoration: none; font-weight: bold; margin-left: 6px; padding: 0 3px;' title='刪除'>✕</a>
+                    </div>
+                    """
+
           st.markdown(
-              f"<div class='calendar-box'><div"
-              f" class='day-num'>{day}</div>",
+              f"""
+                <div class='calendar-box'>
+                    <div class='day-num'>{day}</div>
+                    {events_html}
+                </div>
+                """,
               unsafe_allow_html=True,
           )
-
-          # 每個活動及其右側的刪除符號 (✕) 用 mini columns 完美並排在格內
-          if day_events:
-            for ev in day_events:
-              style_str = color_styles.get(ev["color"], color_styles["藍色"])
-              col_ev, col_del = st.columns([5, 1])
-              with col_ev:
-                st.markdown(
-                    f"<div"
-                    f" style='{style_str}'><b>{ev['name']}</b><br>{ev['time']}</div>",
-                    unsafe_allow_html=True,
-                )
-              with col_del:
-                if st.button(
-                    "✕", key=f"del_{ev['item_id']}", help=f"刪除 {ev['name']}"
-                ):
-                  delete_schedule_db(ev["item_id"])
-                  st.rerun()
-
-          st.markdown("</div>", unsafe_allow_html=True)
