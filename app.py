@@ -6,7 +6,7 @@ import streamlit as st
 
 st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：10週月曆格高度與樣式微調
+# 自訂 CSS：精簡版面與完美高度對齊
 st.markdown(
     """
     <style>
@@ -304,11 +304,17 @@ with col_center:
 
   st.write("")
 
-  # 僅用標準 7 欄顯示星期標題，保持版面簡潔
+  # 纖細嘅左邊月份欄 + 7日星期標題 (總共 8 欄，但好窄)
+  header_cols = st.columns([0.45, 1, 1, 1, 1, 1, 1, 1])
+  header_cols[0].markdown(
+      "<div style='font-weight: bold; text-align: center;"
+      " background-color: #e2e8f0; padding: 6px 2px; border-radius: 4px;"
+      " color: #334155; font-size: 11px;'>月份</div>",
+      unsafe_allow_html=True,
+  )
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
-  header_cols = st.columns(7)
   for i, day_name in enumerate(week_days):
-    header_cols[i].markdown(
+    header_cols[i + 1].markdown(
         f"<div style='font-weight: bold; text-align: center;"
         f" background-color: #f1f5f9; padding: 6px; border-radius: 4px;"
         f" color: #334155; font-size: 12px;'>{day_name}</div>",
@@ -325,28 +331,45 @@ with col_center:
 
   last_month = None
 
-  # 連續渲染 10 個星期（每星期一行，共 10 行）
+  # 連續渲染 10 個星期
   for w in range(10):
     week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
     week_thursday = week_start_d + timedelta(days=4)
     current_month = week_thursday.month
 
-    cols = st.columns(7)
+    row_cols = st.columns([0.45, 1, 1, 1, 1, 1, 1, 1])
+
+    # 左邊極窄月份直行標籤：只喺新月份開始嗰行顯示一次
+    with row_cols[0]:
+      if current_month != last_month:
+        st.markdown(
+            f"<div style='height: 100%; min-height: 150px; display: flex;"
+            f" flex-direction: column; align-items: center; justify-content:"
+            f" center; font-weight: bold; color: #0284c7;"
+            f" background-color: #f0f9ff; border-left: 3px solid #0284c7;"
+            f" border-radius: 4px; font-size: 12px; text-align: center; padding:"
+            f" 2px;'>🌸<br>{current_month}月</div>",
+            unsafe_allow_html=True,
+        )
+        last_month = current_month
+      else:
+        # 同一個月份就保持空白但對齊高度，營造直行連貫感
+        st.markdown(
+            "<div style='min-height: 150px; border-left: 3px solid #e0f2fe;'"
+            "⊃</div>",
+            unsafe_allow_html=True,
+        )
+
+    # 渲染 7 日格仔
     for i in range(7):
       current_d = week_start_d + timedelta(days=i)
       day_events = schedule.get(current_d, [])
 
-      with cols[i]:
+      with row_cols[i + 1]:
         with st.container(border=True):
-          # 如果係每個月嘅第一個星期（或者換咗月份），喺星期日嗰格最上面顯示精美嘅月份標籤
-          month_badge = ""
-          if i == 0 and current_month != last_month:
-            month_badge = f"<span style='background-color: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 4px; font-size: 11px; margin-right: 6px; font-weight: bold;'>🌸 {current_month}月</span>"
-            last_month = current_month
-
           st.markdown(
               f"<div style='font-size: 13px; font-weight: bold; color:"
-              f" #475569;'>{month_badge}{current_d.month}/{current_d.day}</div>",
+              f" #475569;'>{current_d.month}/{current_d.day}</div>",
               unsafe_allow_html=True,
           )
 
