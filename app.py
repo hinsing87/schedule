@@ -4,15 +4,20 @@ import sqlite3
 import uuid
 import streamlit as st
 
-st.set_page_config(page_title="Narisa課外活動助手", layout="wide")
+st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
-# 自訂 CSS：將月曆格高加高到 155px，確保兩行活動完美鬆動
+# 自訂 CSS：精準控制月曆格子高度與內部 Padding，徹底解決貼底問題
 st.markdown(
     """
     <style>
-    /* 將月曆格子高度由 135px 提升到 155px，解決兩行活動時爭少少嘅問題 */
+    /* 將月曆格子高度提升到 175px，並縮減內部上下 padding 確保活動足夠鬆動 */
     [data-testid="stVerticalBlock"] div:has(> [data-testid="stContainer"]) {
-        min-height: 155px;
+        min-height: 175px;
+    }
+    
+    [data-testid="stContainer"] {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
     }
     
     /* 完美無邊框、紅色、極細嘅刪除按鈕樣式 */
@@ -171,7 +176,7 @@ if not activities:
 
 schedule = get_schedule()
 
-st.title("👧 Narisa課外活動管理助手")
+st.title("👧 囡囡課外活動管理助手")
 
 # --- 版面配置：左邊設定，中間大月曆 ---
 col_left, col_center = st.columns([1, 2.8], gap="large")
