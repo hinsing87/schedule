@@ -111,7 +111,6 @@ with col_calendar:
   st.header("🗓️ 黎緊 10 個星期總覽 (月曆)")
   week_days = ["日", "一", "二", "三", "四", "五", "六"]
 
-  # 標題行：月份欄 + 7日星期欄
   h_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
   h_cols[0].markdown("<div style='font-weight: bold; text-align: center; background-color: #e2e8f0; padding: 6px 2px; border-radius: 4px; color: #334155; font-size: 11px;'>月份</div>", unsafe_allow_html=True)
   for idx, d_name in enumerate(week_days):
@@ -135,7 +134,6 @@ with col_calendar:
       day_events = schedule.get(current_d, [])
       with row_cols[i + 1]:
         with st.container(border=True):
-          # 點擊日期按鈕，即時更新右側目標日期
           if st.button(f"{current_d.month}/{current_d.day}", key=f"btn_date_{current_d.isoformat()}", use_container_width=True):
             st.session_state.sel_date = current_d
             st.rerun()
@@ -184,23 +182,49 @@ with col_setting:
   if not activities:
     st.write("暫時未有活動，請在下方新增。")
   else:
-    for act_id, info in list(activities.items()):
-      emoji = color_emojis.get(info["color"], "📌")
-
-      if st.session_state.edit_act_mode:
-        c_act, c_del = st.columns([4, 1])
-        with c_act:
+    # --- 兩欄排版邏輯 ---
+    act_items = list(activities.items())
+    for i in range(0, len(act_items), 2):
+      row_act_cols = st.columns(2)
+      
+      # 左欄活動
+      with row_act_cols[0]:
+        act_id, info = act_items[i]
+        emoji = color_emojis.get(info["color"], "📌")
+        if st.session_state.edit_act_mode:
+          sub_c1, sub_c2 = st.columns([4, 1])
+          with sub_c1:
+            if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+              st.session_state.selected_act_id = act_id
+          with sub_c2:
+            if st.button("✕", key=f"del_act_{act_id}"):
+              delete_activity_db(act_id)
+              if st.session_state.get("selected_act_id") == act_id:
+                st.session_state.pop("selected_act_id", None)
+              st.rerun()
+        else:
           if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
             st.session_state.selected_act_id = act_id
-        with c_del:
-          if st.button("✕", key=f"del_act_{act_id}"):
-            delete_activity_db(act_id)
-            if st.session_state.get("selected_act_id") == act_id:
-              st.session_state.pop("selected_act_id", None)
-            st.rerun()
-      else:
-        if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
-          st.session_state.selected_act_id = act_id
+
+      # 右欄活動（如果有單數個活動，右欄留空）
+      if i + 1 < len(act_items):
+        with row_act_cols[1]:
+          act_id, info = act_items[i+1]
+          emoji = color_emojis.get(info["color"], "📌")
+          if st.session_state.edit_act_mode:
+            sub_c1, sub_c2 = st.columns([4, 1])
+            with sub_c1:
+              if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+                st.session_state.selected_act_id = act_id
+            with sub_c2:
+              if st.button("✕", key=f"del_act_{act_id}"):
+                delete_activity_db(act_id)
+                if st.session_state.get("selected_act_id") == act_id:
+                  st.session_state.pop("selected_act_id", None)
+                st.rerun()
+          else:
+            if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+              st.session_state.selected_act_id = act_id
 
   if "selected_act_id" not in st.session_state and activities:
     st.session_state.selected_act_id = list(activities.keys())[0]
