@@ -175,6 +175,10 @@ schedule = get_schedule()
 
 st.title("👧 囡囡課外活動管理助手")
 
+# 初始化 session state 存放選中的日期
+if "sel_date" not in st.session_state:
+  st.session_state.sel_date = date.today()
+
 # --- 自動偵測是否為手機版 ---
 headers = st.context.headers
 ua = headers.get("User-Agent", "").lower() if headers else ""
@@ -261,11 +265,14 @@ with col_calendar:
           col_d_info, col_d_act = st.columns([1.2, 3])
           with col_d_info:
             is_today = "🔥 " if current_d == date.today() else ""
-            st.markdown(
-                f"<div style='font-size: 13px; font-weight: bold; color:"
-                f" #1e293b;'>{is_today}{current_d.strftime('%m/%d')} ({w_day_name})</div>",
-                unsafe_allow_html=True,
-            )
+            # 點擊日期按鈕可以直接選中日期
+            if st.button(
+                f"{is_today}{current_d.strftime('%m/%d')} ({w_day_name})",
+                key=f"btn_date_m_{current_d.isoformat()}",
+                use_container_width=True,
+            ):
+              st.session_state.sel_date = current_d
+              st.rerun()
 
           with col_d_act:
             if day_events:
@@ -341,11 +348,20 @@ with col_calendar:
         day_events = schedule.get(current_d, [])
         with row_cols[i + 1]:
           with st.container(border=True):
-            st.markdown(
-                f"<div style='font-size: 11px; font-weight: bold; color:"
-                f" #475569;'>{current_d.month}/{current_d.day}</div>",
-                unsafe_allow_html=True,
+            # 將日期變成按鈕，點擊即可選中該日作為目標日期
+            is_selected_style = (
+                "border: 1px solid #0284c7; background-color: #f0f9ff;"
+                if st.session_state.sel_date == current_d
+                else ""
             )
+            if st.button(
+                f"{current_d.month}/{current_d.day}",
+                key=f"btn_date_{current_d.isoformat()}",
+                use_container_width=True,
+            ):
+              st.session_state.sel_date = current_d
+              st.rerun()
+
             rendered_count = 0
             if day_events:
               for ev in day_events:
@@ -371,18 +387,30 @@ with col_setting:
   st.header("⚙️ 設定與排程")
 
   st.subheader("📌 選擇日期")
-  sel_date = st.date_input("選擇目標日期", value=date.today())
+  # 將 date_input 綁定到 session_state.sel_date
+  sel_date = st.date_input(
+      "選擇目標日期",
+      value=st.session_state.sel_date,
+      key="date_input_widget",
+      on_change=lambda: setattr(
+          st.session_state,
+          "sel_date",
+          st.session_state.date_input_widget,
+      ),
+  )
+
+  # 同步更新
+  st.session_state.sel_date = sel_date
 
   st.divider()
 
   # 頂部加入設定開關用來控制刪除活動按鈕
   c_lib_title, c_lib_setting = st.columns([3, 1])
   c_lib_title.subheader("📚 活動庫 (點選安排)")
-  # 用 toggle 或 checkbox 做設定掣
+
   if "edit_act_mode" not in st.session_state:
     st.session_state.edit_act_mode = False
-  
-  # 點擊設定按鈕切換狀態
+
   if c_lib_setting.button("⚙️ 設定", use_container_width=True):
     st.session_state.edit_act_mode = not st.session_state.edit_act_mode
     st.rerun()
@@ -392,12 +420,15 @@ with col_setting:
   else:
     for act_id, info in list(activities.items()):
       emoji = color_emojis.get(info["color"], "📌")
-      
+
       if st.session_state.edit_act_mode:
-        # 刪除模式：左邊係按鈕顯示活動，右邊係刪除 X 掣
         c_act, c_del = st.columns([4, 1])
         with c_act:
-          if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+          if st.button(
+              f"{emoji} {info['name']} ({info['time']})",
+              key=f"sel_{act_id}",
+              use_container_width=True,
+          ):
             st.session_state.selected_act_id = act_id
         with c_del:
           if st.button("✕", key=f"del_act_{act_id}"):
@@ -406,23 +437,28 @@ with col_setting:
               st.session_state.pop("selected_act_id", None)
             st.rerun()
       else:
-        # 普通模式：整行係活動按鈕
-        if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+        if st.button(
+            f"{emoji} {info['name']} ({info['time']})",
+            key=f"sel_{act_id}",
+            use_container_width=True,
+        ):
           st.session_state.selected_act_id = act_id
 
-  # 記錄目前選中的活動
   if "selected_act_id" not in st.session_state and activities:
     st.session_state.selected_act_id = list(activities.keys())[0]
 
-  # 如果剛選中的 id 已經被刪除，重新指向第一個
   if st.session_state.get("selected_act_id") not in activities and activities:
     st.session_state.selected_act_id = list(activities.keys())[0]
 
   if activities and st.session_state.get("selected_act_id") in activities:
     chosen_info = activities[st.session_state.selected_act_id]
     emoji = color_emojis.get(chosen_info["color"], "📌")
-    st.markdown(f"**已選擇：** {emoji} <span style='color: #0284c7; font-weight: bold;'>{chosen_info['name']} ({chosen_info['time']})</span>", unsafe_allow_html=True)
-    
+    st.markdown(
+        f"**已選擇：** {emoji} <span style='color: #0284c7; font-weight:"
+        f" bold;'>{chosen_info['name']} ({chosen_info['time']})</span>",
+        unsafe_allow_html=True,
+    )
+
     st.write("")
     c_btn1, c_btn2, c_btn3 = st.columns(3)
     if c_btn1.button("📅 單次", use_container_width=True):
