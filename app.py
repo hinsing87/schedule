@@ -1,10 +1,9 @@
 import calendar
 from datetime import date, timedelta
-import sqlite3
 import uuid
 import streamlit as st
 
-st.set_page_config(page_title="囡囡課外活動管理助手", layout="wide")
+st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
 
 # 自訂 CSS：強制光亮模式背景及精緻刪除按鈕
 st.markdown(
@@ -40,129 +39,118 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# --- 建立 Streamlit 內置 SQL 連線 ---
+conn = st.connection("sql", type="sql")
 
-# --- 初始化 SQLite 資料庫 ---
+
+# --- 初始化資料庫表格 ---
 def init_db():
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  c.execute(
-      """
-        CREATE TABLE IF NOT EXISTS activities (
-            act_id TEXT PRIMARY KEY,
-            name TEXT,
-            time TEXT,
-            color TEXT
-        )
-    """
-  )
-  c.execute(
-      """
-        CREATE TABLE IF NOT EXISTS schedule (
-            item_id TEXT PRIMARY KEY,
-            act_id TEXT,
-            date TEXT,
-            name TEXT,
-            time TEXT,
-            color TEXT
-        )
-    """
-  )
-  conn.commit()
-  conn.close()
+  with conn.session as s:
+    s.execute(
+        """
+            CREATE TABLE IF NOT EXISTS activities (
+                act_id TEXT PRIMARY KEY,
+                name TEXT,
+                time TEXT,
+                color TEXT
+            )
+        """
+    )
+    s.execute(
+        """
+            CREATE TABLE IF NOT EXISTS schedule (
+                item_id TEXT PRIMARY KEY,
+                act_id TEXT,
+                date TEXT,
+                name TEXT,
+                time TEXT,
+                color TEXT
+            )
+        """
+    )
+    s.commit()
 
 
 init_db()
 
 
 def get_activities():
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  try:
-    c.execute("SELECT act_id, name, time, color FROM activities")
-  except sqlite3.OperationalError:
-    c.execute("ALTER TABLE activities ADD COLUMN color TEXT")
-    conn.commit()
-    c.execute("SELECT act_id, name, time, color FROM activities")
-  rows = c.fetchall()
-  conn.close()
-  return {
-      row[0]: {
-          "name": row[1],
-          "time": row[2],
-          "color": row[3] if row[3] else "藍色",
-      }
-      for row in rows
-  }
+  df = conn.query("SELECT act_id, name, time, color FROM activities", ttl=0)
+  if df.empty:
+    return {}
+  result = {}
+  for _, row in df.iterrows():
+    result[row["act_id"]] = {
+        "name": row["name"],
+        "time": row["time"],
+        "color": row["color"] if row["color"] else "藍色",
+    }
+  return result
 
 
 def add_activity_db(act_id, name, time, color):
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  c.execute(
-      "INSERT OR REPLACE INTO activities (act_id, name, time, color) VALUES"
-      " (?, ?, ?, ?)",
-      (act_id, name, time, color),
-  )
-  conn.commit()
-  conn.close()
+  with conn.session as s:
+    # 確保資料表有 color 欄位 (相容性處理)
+    s.execute(
+        "INSERT OR REPLACE INTO activities (act_id, name, time, color) VALUES"
+        " (:act_id, :name, :time, :color)",
+        {"act_id": act_id, "name": name, "time": time, "color": color},
+    )
+    s.commit()
 
 
 def delete_activity_db(act_id):
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  c.execute("DELETE FROM activities WHERE act_id = ?", (act_id,))
-  conn.commit()
-  conn.close()
+  with conn.session as s:
+    s.execute("DELETE FROM activities WHERE act_id = :act_id", {"act_id": act_id})
+    s.commit()
 
 
 def get_schedule():
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  try:
-    c.execute("SELECT item_id, act_id, date, name, time, color FROM schedule")
-  except sqlite3.OperationalError:
-    c.execute("ALTER TABLE schedule ADD COLUMN color TEXT")
-    conn.commit()
-    c.execute("SELECT item_id, act_id, date, name, time, color FROM schedule")
-  rows = c.fetchall()
-  conn.close()
-
+  df = conn.query(
+      "SELECT item_id, act_id, date, name, time, color FROM schedule", ttl=0
+  )
   sched = {}
-  for row in rows:
-    item_id, act_id, d_str, name, time, color = row
-    d = date.fromisoformat(d_str)
+  if df.empty:
+    return sched
+  for _, row in df.iterrows():
+    d = date.fromisoformat(row["date"])
     if d not in sched:
       sched[d] = []
     sched[d].append(
         {
-            "item_id": item_id,
-            "act_id": act_id,
-            "name": name,
-            "time": time,
-            "color": color if color else "藍色",
+            "item_id": row["item_id"],
+            "act_id": row["act_id"],
+            "name": row["name"],
+            "time": row["time"],
+            "color": row["color"] if row["color"] else "藍色",
         }
     )
   return sched
 
 
 def add_schedule_db(item_id, act_id, d_str, name, time, color):
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  c.execute(
-      "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
-      " color) VALUES (?, ?, ?, ?, ?, ?)",
-      (item_id, act_id, d_str, name, time, color),
-  )
-  conn.commit()
-  conn.close()
+  with conn.session as s:
+    s.execute(
+        "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
+        " color) VALUES (:item_id, :act_id, :date, :name, :time, :color)",
+        {
+            "item_id": item_id,
+            "act_id": act_id,
+            "date": d_str,
+            "name": name,
+            "time": time,
+            "color": color,
+        },
+    )
+    s.commit()
 
 
 def delete_schedule_db(item_id):
-  conn = sqlite3.connect("schedule.db")
-  c = conn.cursor()
-  c.execute("DELETE FROM schedule WHERE item_id = ?", (item_id,))
-  conn.commit()
-  conn.close()
+  with conn.session as s:
+    s.execute(
+        "DELETE FROM schedule WHERE item_id = :item_id", {"item_id": item_id}
+    )
+    s.commit()
 
 
 activities = get_activities()
@@ -238,12 +226,10 @@ with col_calendar:
   }
 
   # ==========================================
-  # A. 手機版：上下清單檢視 (已修正星期對應)
+  # A. 手機版：上下清單檢視
   # ==========================================
   if is_mobile:
     st.header("📋 黎緊 10 個星期活動清單 (手機專用)")
-    # Python weekday(): 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
-    # 我們的星期陣列由星期日開始：[日, 一, 二, 三, 四, 五, 六]
     weekdays_zh = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
 
     for w in range(10):
@@ -257,7 +243,6 @@ with col_calendar:
       for i in range(7):
         current_d = week_start_d + timedelta(days=i)
         day_events = schedule.get(current_d, [])
-        # 修正：正確對應星期 (current_d.weekday() + 1) % 7 確保 0=日, 1=一...6=六
         w_day_name = weekdays_zh[(current_d.weekday() + 1) % 7]
 
         with st.container(border=True):
