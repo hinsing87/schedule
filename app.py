@@ -2,8 +2,9 @@ import calendar
 from datetime import date, timedelta
 import uuid
 import streamlit as st
+from sqlalchemy import text
 
-st.set_page_config(page_title="囡囡課外活動助手", layout="wide")
+st.set_page_config(page_title="囡囡課外活動管理助手", layout="wide")
 
 # 自訂 CSS：強制光亮模式背景及精緻刪除按鈕
 st.markdown(
@@ -47,7 +48,8 @@ conn = st.connection("sql", type="sql")
 def init_db():
   with conn.session as s:
     s.execute(
-        """
+        text(
+            """
             CREATE TABLE IF NOT EXISTS activities (
                 act_id TEXT PRIMARY KEY,
                 name TEXT,
@@ -55,9 +57,11 @@ def init_db():
                 color TEXT
             )
         """
+        )
     )
     s.execute(
-        """
+        text(
+            """
             CREATE TABLE IF NOT EXISTS schedule (
                 item_id TEXT PRIMARY KEY,
                 act_id TEXT,
@@ -67,6 +71,7 @@ def init_db():
                 color TEXT
             )
         """
+        )
     )
     s.commit()
 
@@ -90,10 +95,11 @@ def get_activities():
 
 def add_activity_db(act_id, name, time, color):
   with conn.session as s:
-    # 確保資料表有 color 欄位 (相容性處理)
     s.execute(
-        "INSERT OR REPLACE INTO activities (act_id, name, time, color) VALUES"
-        " (:act_id, :name, :time, :color)",
+        text(
+            "INSERT OR REPLACE INTO activities (act_id, name, time, color)"
+            " VALUES (:act_id, :name, :time, :color)"
+        ),
         {"act_id": act_id, "name": name, "time": time, "color": color},
     )
     s.commit()
@@ -101,7 +107,10 @@ def add_activity_db(act_id, name, time, color):
 
 def delete_activity_db(act_id):
   with conn.session as s:
-    s.execute("DELETE FROM activities WHERE act_id = :act_id", {"act_id": act_id})
+    s.execute(
+        text("DELETE FROM activities WHERE act_id = :act_id"),
+        {"act_id": act_id},
+    )
     s.commit()
 
 
@@ -131,8 +140,10 @@ def get_schedule():
 def add_schedule_db(item_id, act_id, d_str, name, time, color):
   with conn.session as s:
     s.execute(
-        "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
-        " color) VALUES (:item_id, :act_id, :date, :name, :time, :color)",
+        text(
+            "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
+            " color) VALUES (:item_id, :act_id, :date, :name, :time, :color)"
+        ),
         {
             "item_id": item_id,
             "act_id": act_id,
@@ -148,7 +159,8 @@ def add_schedule_db(item_id, act_id, d_str, name, time, color):
 def delete_schedule_db(item_id):
   with conn.session as s:
     s.execute(
-        "DELETE FROM schedule WHERE item_id = :item_id", {"item_id": item_id}
+        text("DELETE FROM schedule WHERE item_id = :item_id"),
+        {"item_id": item_id},
     )
     s.commit()
 
