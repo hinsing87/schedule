@@ -370,26 +370,66 @@ with col_calendar:
 with col_setting:
   st.header("⚙️ 設定與排程")
 
-  st.subheader("📌 安排活動到日期")
-  if activities:
-    sel_date = st.date_input("選擇日期", value=date.today())
-    act_options = {
-        act_id: f"{info['name']} ({info['time']})"
-        for act_id, info in activities.items()
-    }
-    selected_act_id = st.selectbox(
-        "選擇活動",
-        options=list(act_options.keys()),
-        format_func=lambda x: act_options[x],
-    )
-    chosen_info = activities[selected_act_id]
+  st.subheader("📌 選擇日期")
+  sel_date = st.date_input("選擇目標日期", value=date.today())
 
+  st.divider()
+
+  # 頂部加入設定開關用來控制刪除活動按鈕
+  c_lib_title, c_lib_setting = st.columns([3, 1])
+  c_lib_title.subheader("📚 活動庫 (點選安排)")
+  # 用 toggle 或 checkbox 做設定掣
+  if "edit_act_mode" not in st.session_state:
+    st.session_state.edit_act_mode = False
+  
+  # 點擊設定按鈕切換狀態
+  if c_lib_setting.button("⚙️ 設定", use_container_width=True):
+    st.session_state.edit_act_mode = not st.session_state.edit_act_mode
+    st.rerun()
+
+  if not activities:
+    st.write("暫時未有活動，請在下方新增。")
+  else:
+    for act_id, info in list(activities.items()):
+      emoji = color_emojis.get(info["color"], "📌")
+      
+      if st.session_state.edit_act_mode:
+        # 刪除模式：左邊係按鈕顯示活動，右邊係刪除 X 掣
+        c_act, c_del = st.columns([4, 1])
+        with c_act:
+          if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+            st.session_state.selected_act_id = act_id
+        with c_del:
+          if st.button("✕", key=f"del_act_{act_id}"):
+            delete_activity_db(act_id)
+            if st.session_state.get("selected_act_id") == act_id:
+              st.session_state.pop("selected_act_id", None)
+            st.rerun()
+      else:
+        # 普通模式：整行係活動按鈕
+        if st.button(f"{emoji} {info['name']} ({info['time']})", key=f"sel_{act_id}", use_container_width=True):
+          st.session_state.selected_act_id = act_id
+
+  # 記錄目前選中的活動
+  if "selected_act_id" not in st.session_state and activities:
+    st.session_state.selected_act_id = list(activities.keys())[0]
+
+  # 如果剛選中的 id 已經被刪除，重新指向第一個
+  if st.session_state.get("selected_act_id") not in activities and activities:
+    st.session_state.selected_act_id = list(activities.keys())[0]
+
+  if activities and st.session_state.get("selected_act_id") in activities:
+    chosen_info = activities[st.session_state.selected_act_id]
+    emoji = color_emojis.get(chosen_info["color"], "📌")
+    st.markdown(f"**已選擇：** {emoji} <span style='color: #0284c7; font-weight: bold;'>{chosen_info['name']} ({chosen_info['time']})</span>", unsafe_allow_html=True)
+    
+    st.write("")
     c_btn1, c_btn2, c_btn3 = st.columns(3)
     if c_btn1.button("📅 單次", use_container_width=True):
       item_id = str(uuid.uuid4())[:8]
       add_schedule_db(
           item_id,
-          selected_act_id,
+          st.session_state.selected_act_id,
           sel_date.isoformat(),
           chosen_info["name"],
           chosen_info["time"],
@@ -404,7 +444,7 @@ with col_setting:
         item_id = str(uuid.uuid4())[:8]
         add_schedule_db(
             item_id,
-            selected_act_id,
+            st.session_state.selected_act_id,
             target_date.isoformat(),
             chosen_info["name"],
             chosen_info["time"],
@@ -419,7 +459,7 @@ with col_setting:
         item_id = str(uuid.uuid4())[:8]
         add_schedule_db(
             item_id,
-            selected_act_id,
+            st.session_state.selected_act_id,
             target_date.isoformat(),
             chosen_info["name"],
             chosen_info["time"],
@@ -440,18 +480,6 @@ with col_setting:
     if act_name:
       new_id = str(uuid.uuid4())[:8]
       add_activity_db(new_id, act_name, act_time, act_color)
+      st.session_state.selected_act_id = new_id
       st.success(f"已新增: {act_name}")
       st.rerun()
-
-  st.divider()
-
-  st.subheader("📋 現有活動庫")
-  if not activities:
-    st.write("暫時未有活動。")
-  else:
-    for act_id, info in list(activities.items()):
-      c_a, c_b = st.columns([3, 1])
-      c_a.write(f"**{info['name']}** ({info['time']})")
-      if c_b.button("🗑️", key=f"del_act_{act_id}"):
-        delete_activity_db(act_id)
-        st.rerun()
