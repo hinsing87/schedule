@@ -65,10 +65,15 @@ def get_activities():
 
 def add_activity_db(act_id, name, time, color):
   with conn.session as s:
+    # PostgreSQL 專用嘅 Upsert (ON CONFLICT) 語法
     s.execute(
         text(
-            "INSERT OR REPLACE INTO activities (act_id, name, time, color)"
-            " VALUES (:act_id, :name, :time, :color)"
+            """
+            INSERT INTO activities (act_id, name, time, color) 
+            VALUES (:act_id, :name, :time, :color)
+            ON CONFLICT (act_id) 
+            DO UPDATE SET name = EXCLUDED.name, time = EXCLUDED.time, color = EXCLUDED.color
+        """
         ),
         {"act_id": act_id, "name": name, "time": time, "color": color},
     )
@@ -109,10 +114,15 @@ def get_schedule():
 
 def add_schedule_db(item_id, act_id, d_str, name, time, color):
   with conn.session as s:
+    # PostgreSQL 專用嘅 Upsert (ON CONFLICT) 語法
     s.execute(
         text(
-            "INSERT OR REPLACE INTO schedule (item_id, act_id, date, name, time,"
-            " color) VALUES (:item_id, :act_id, :date, :name, :time, :color)"
+            """
+            INSERT INTO schedule (item_id, act_id, date, name, time, color) 
+            VALUES (:item_id, :act_id, :date, :name, :time, :color)
+            ON CONFLICT (item_id) 
+            DO UPDATE SET act_id = EXCLUDED.act_id, date = EXCLUDED.date, name = EXCLUDED.name, time = EXCLUDED.time, color = EXCLUDED.color
+        """
         ),
         {
             "item_id": item_id,
