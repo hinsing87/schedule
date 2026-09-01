@@ -1,6 +1,14 @@
 import calendar
 from datetime import date, timedelta
+import io
 import uuid
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 import streamlit as st
 from sqlalchemy import text
 
@@ -13,7 +21,6 @@ st.markdown(
     :root { color-scheme: light; }
     .stApp { background-color: #ffffff !important; color: #1e293b !important; }
     
-    /* 極細精緻刪除按鈕 */
     button[kind="secondary"] {
         background-color: transparent !important; border: none !important; box-shadow: none !important;
         color: #ef4444 !important; font-weight: bold !important; font-size: 12px !important;
@@ -65,7 +72,6 @@ def get_activities():
 
 def add_activity_db(act_id, name, time, color):
   with conn.session as s:
-    # PostgreSQL 專用嘅 Upsert (ON CONFLICT) 語法
     s.execute(
         text(
             """
@@ -114,7 +120,6 @@ def get_schedule():
 
 def add_schedule_db(item_id, act_id, d_str, name, time, color):
   with conn.session as s:
-    # PostgreSQL 專用嘅 Upsert (ON CONFLICT) 語法
     s.execute(
         text(
             """
@@ -145,6 +150,99 @@ def delete_schedule_db(item_id):
     s.commit()
 
 
+# --- PDF 生成核心函數 ---
+def generate_pdf_schedule(start_date, schedule_data):
+  buffer = io.BytesIO()
+  # 使用橫向 A4 尺寸
+  doc = SimpleDocTemplate(
+      buffer,
+      pagesize=landscape(A4),
+      rightMargin=30,
+      leftMargin=30,
+      topMargin=30,
+      bottomMargin=30,
+  )
+  elements = []
+
+  # 註冊中文字型 (使用內置或雲端通用思源黑體防亂碼，如無則用標準 Helvetica 但中文會變方格，因此需處理)
+  # 由於雲端環境簡化，我們用系統內建或者 fallback 寫法，如需完美中文，建議用系統字體
+  try:
+    # 嘗試註冊香港常用嘅中文字體 (如 NotoSansCJK 或系統現有字型)
+    pdfmetrics.registerFont(
+        TTFont("CJKFont", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc")
+    )
+    font_name = "CJKFont"
+  except:
+    font_name = "Helvetica"  # 如果搵唔到就用英文/預設 (避免Crash)
+
+  styles = getSampleStyleSheet()
+  title_style = ParagraphStyle(
+      "TitleStyle",
+      parent=styles["Heading1"],
+      fontName=font_name,
+      fontSize=18,
+      textColor=colors.HexColor("#0284c7"),
+      alignment=1,  # 置中
+      spaceAfter=15,
+  )
+
+  # 標題
+  end_date = start_date + timedelta(days=(8 * 7) - 1)
+  elements.append(
+      Paragraph(
+          f"<b>囡囡課外活動時間表總覽 ({start_date.strftime('%Y/%m/%d')} ~"
+          f" {end_date.strftime('%Y/%m/%d')})</b>",
+          title_style,
+      )
+  )
+
+  # 表格欄位名稱
+  table_data = [["月份", "日", "一", "二", "三", "四", "五", "六"]]
+
+  week_days = ["日", "一", "二", "三", "四", "五", "六"]
+
+  # 產生 8 個星期嘅資料
+  for w in range(8):
+    week_start = start_date + timedelta(days=w * 7)
+    month_str = f"{week_start.month}月"
+    row = [month_str]
+    for i in range(7):
+      curr_d = week_start + timedelta(days=i)
+      day_events = schedule_data.get(curr_d, [])
+      cell_text = f"<b>{curr_d.month}/{curr_d.day}</b><br/>"
+      if day_events:
+        for ev in day_events:
+          cell_text += f"<font size=8 color='#334155'>• {ev['name']} ({ev['time']})</font><br/>"
+      row.append(cell_text)
+    table_data.append(row)
+
+  # 設定表格闊度 (總寬約 780 pt)
+  col_widths = [55, 103, 103, 103, 103, 103, 103, 103]
+  t = Table(table_data, colWidths=col_widths)
+  t.setStyle(
+      TableStyle([
+          (
+              "BACKGROUND",
+              (0, 0),
+              (-1, 0),
+              colors.HexColor("#f1f5f9"),
+          ),  # 表頭背景
+          ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+          ("VALIGN", (0, 0), (-1, -1), "TOP"),
+          ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),  # 格線
+          ("FONTNAME", (0, 0), (-1, -1), font_name),
+          ("FONTSIZE", (0, 0), (-1, -1), 9),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+          ("TOPPADDING", (0, 0), (-1, -1), 8),
+      ])
+  )
+
+  elements.append(t)
+  doc.build(elements)
+  buffer.seek(0)
+  return buffer.getvalue()
+
+
 # --- 初始化資料 ---
 activities = get_activities()
 if not activities:
@@ -170,7 +268,7 @@ col_calendar, col_setting = st.columns([3.2, 1], gap="large")
 # 左側：月曆檢視區
 # ==========================================
 with col_calendar:
-  c_prev, c_title, c_next = st.columns([1, 4, 1])
+  c_prev, c_title, c_next, c_pdf = st.columns([1, 3.2, 1, 1.3])
   if c_prev.button("◀ 上一星期", use_container_width=True):
     st.session_state.start_week_date -= timedelta(weeks=1)
     st.rerun()
@@ -180,7 +278,7 @@ with col_calendar:
   )
   c_title.markdown(
       f"<h3 style='text-align: center; margin: 0; color: #1e293b; font-size:"
-      f" 15px; padding-top: 6px;'>{st.session_state.start_week_date.strftime('%Y/%m/%d')} ~"
+      f" 14px; padding-top: 6px;'>{st.session_state.start_week_date.strftime('%Y/%m/%d')} ~"
       f" {end_date_display.strftime('%Y/%m/%d')}</h3>",
       unsafe_allow_html=True,
   )
@@ -188,6 +286,16 @@ with col_calendar:
   if c_next.button("下一星期 ▶", use_container_width=True):
     st.session_state.start_week_date += timedelta(weeks=1)
     st.rerun()
+
+  # PDF 下載按鈕
+  pdf_data = generate_pdf_schedule(st.session_state.start_week_date, schedule)
+  c_pdf.download_button(
+      label="📥 下載 8 週 PDF",
+      data=pdf_data,
+      file_name=f"Schedule_{st.session_state.start_week_date.isoformat()}.pdf",
+      mime="application/pdf",
+      use_container_width=True,
+  )
 
   st.write("")
   color_emojis = {
@@ -275,7 +383,7 @@ with col_calendar:
             rendered_count += 1
 
 # ==========================================
-# 右側：設定與活動庫區 (1行3欄)
+# 右側：設定與活動庫區
 # ==========================================
 with col_setting:
   st.header("⚙️ 設定與排程")
@@ -288,7 +396,6 @@ with col_setting:
 
   st.divider()
 
-  # 活動庫標題與設定掣
   c_lib_title, c_lib_setting = st.columns([3, 1])
   c_lib_title.subheader("📚 活動庫 (點選安排)")
 
