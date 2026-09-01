@@ -5,13 +5,11 @@ import uuid
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 import streamlit as st
 from sqlalchemy import text
 
-st.set_page_config(page_title="囡囡課外活動管理助手", layout="wide")
+st.set_page_config(page_title="Activity Management Assistant", layout="wide")
 
 # --- 自訂 CSS 樣式 ---
 st.markdown(
@@ -63,7 +61,7 @@ def get_activities():
       row["act_id"]: {
           "name": row["name"],
           "time": row["time"],
-          "color": row["color"] if row["color"] else "藍色",
+          "color": row["color"] if row["color"] else "Blue",
       }
       for _, row in df.iterrows()
   }
@@ -111,7 +109,7 @@ def get_schedule():
             "act_id": row["act_id"],
             "name": row["name"],
             "time": row["time"],
-            "color": row["color"] if row["color"] else "藍色",
+            "color": row["color"] if row["color"] else "Blue",
         }
     )
   return sched
@@ -149,7 +147,7 @@ def delete_schedule_db(item_id):
     s.commit()
 
 
-# --- PDF 生成核心函數 ---
+# --- PDF 生成核心函數 (全英文) ---
 def generate_pdf_schedule(start_date, schedule_data):
   buffer = io.BytesIO()
   doc = SimpleDocTemplate(
@@ -162,24 +160,15 @@ def generate_pdf_schedule(start_date, schedule_data):
   )
   elements = []
 
-  # 註冊中文字型 (支援 Linux 雲端環境)
+  # 使用內置 Helvetica 字型 (完美支援英文，不會出現方格)
   font_name = "Helvetica"
-  for font_path in [
-      "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  ]:
-    try:
-      pdfmetrics.registerFont(TTFont("CustomCJK", font_path))
-      font_name = "CustomCJK"
-      break
-    except:
-      continue
+  font_bold = "Helvetica-Bold"
 
   styles = getSampleStyleSheet()
   title_style = ParagraphStyle(
       "TitleStyle",
       parent=styles["Heading1"],
-      fontName=font_name,
+      fontName=font_bold,
       fontSize=16,
       textColor=colors.HexColor("#0284c7"),
       alignment=1,
@@ -198,7 +187,7 @@ def generate_pdf_schedule(start_date, schedule_data):
   header_style = ParagraphStyle(
       "HeaderStyle",
       parent=styles["Normal"],
-      fontName=font_name,
+      fontName=font_bold,
       fontSize=9,
       leading=11,
       alignment=1,
@@ -208,28 +197,28 @@ def generate_pdf_schedule(start_date, schedule_data):
   end_date = start_date + timedelta(days=(8 * 7) - 1)
   elements.append(
       Paragraph(
-          f"<b>囡囡課外活動時間表總覽 ({start_date.strftime('%Y/%m/%d')} ~"
+          f"<b>Activity Schedule Overview ({start_date.strftime('%Y/%m/%d')} ~"
           f" {end_date.strftime('%Y/%m/%d')})</b>",
           title_style,
       )
   )
 
-  # 表格標題列
-  week_days = ["月份", "日", "一", "二", "三", "四", "五", "六"]
+  # 英文表格標題列
+  week_days = ["Month", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   header_row = [Paragraph(f"<b>{d}</b>", header_style) for d in week_days]
   table_data = [header_row]
 
-  # 產生 8 個星期嘅資料，並全部以 Paragraph 包裝以正確解析 HTML 標籤
+  # 產生 8 個星期嘅資料
   for w in range(8):
     week_start = start_date + timedelta(days=w * 7)
-    month_str = f"<b>{week_start.month}月</b>"
+    month_str = f"<b>{week_start.strftime('%b')}</b>"  # 顯示英文月份縮寫 (如 Aug, Sep)
     row = [Paragraph(month_str, header_style)]
 
     for i in range(7):
       curr_d = week_start + timedelta(days=i)
       day_events = schedule_data.get(curr_d, [])
 
-      cell_content = f"<b>{curr_d.month}/{curr_d.day}</b><br/>"
+      cell_content = f"<b>{curr_d.strftime('%b %d')}</b><br/>"
       if day_events:
         for ev in day_events:
           cell_content += f"• {ev['name']} ({ev['time']})<br/>"
@@ -237,7 +226,7 @@ def generate_pdf_schedule(start_date, schedule_data):
       row.append(Paragraph(cell_content, cell_style))
     table_data.append(row)
 
-  col_widths = [45, 105, 105, 105, 105, 105, 105, 105]
+  col_widths = [50, 103, 103, 103, 103, 103, 103, 103]
   t = Table(table_data, colWidths=col_widths)
   t.setStyle(
       TableStyle([
@@ -264,8 +253,8 @@ def generate_pdf_schedule(start_date, schedule_data):
 # --- 初始化資料 ---
 activities = get_activities()
 if not activities:
-  add_activity_db(str(uuid.uuid4())[:8], "鋼琴班", "16:00", "粉紅")
-  add_activity_db(str(uuid.uuid4())[:8], "游泳班", "10:00", "藍色")
+  add_activity_db(str(uuid.uuid4())[:8], "Piano", "16:00", "Pink")
+  add_activity_db(str(uuid.uuid4())[:8], "Swimming", "10:00", "Blue")
   activities = get_activities()
 
 schedule = get_schedule()
@@ -278,7 +267,7 @@ if "start_week_date" not in st.session_state:
       days=days_to_sunday
   )
 
-st.title("👧 囡囡課外活動管理助手")
+st.title("👧 Activities Schedule Assistant")
 
 col_calendar, col_setting = st.columns([3.2, 1], gap="large")
 
@@ -287,7 +276,7 @@ col_calendar, col_setting = st.columns([3.2, 1], gap="large")
 # ==========================================
 with col_calendar:
   c_prev, c_title, c_next, c_pdf = st.columns([1, 3.2, 1, 1.3])
-  if c_prev.button("◀ 上一星期", use_container_width=True):
+  if c_prev.button("◀ Prev Week", use_container_width=True):
     st.session_state.start_week_date -= timedelta(weeks=1)
     st.rerun()
 
@@ -301,14 +290,14 @@ with col_calendar:
       unsafe_allow_html=True,
   )
 
-  if c_next.button("下一星期 ▶", use_container_width=True):
+  if c_next.button("Next Week ▶", use_container_width=True):
     st.session_state.start_week_date += timedelta(weeks=1)
     st.rerun()
 
   # PDF 下載按鈕
   pdf_data = generate_pdf_schedule(st.session_state.start_week_date, schedule)
   c_pdf.download_button(
-      label="📥 下載 8 週 PDF",
+      label="📥 Download 8-Week PDF",
       data=pdf_data,
       file_name=f"Schedule_{st.session_state.start_week_date.isoformat()}.pdf",
       mime="application/pdf",
@@ -317,21 +306,21 @@ with col_calendar:
 
   st.write("")
   color_emojis = {
-      "粉紅": "🌸",
-      "藍色": "🔷",
-      "紫色": "🟣",
-      "綠色": "🟢",
-      "黃色": "🟡",
+      "Pink": "🌸",
+      "Blue": "🔷",
+      "Purple": "🟣",
+      "Green": "🟢",
+      "Yellow": "🟡",
   }
 
-  st.header("🗓️ 黎緊 10 個星期總覽 (月曆)")
-  week_days = ["日", "一", "二", "三", "四", "五", "六"]
+  st.header("🗓️ Next 10 Weeks Overview")
+  week_days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
   h_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
   h_cols[0].markdown(
       "<div style='font-weight: bold; text-align: center; background-color:"
       " #e2e8f0; padding: 6px 2px; border-radius: 4px; color: #334155; font-size:"
-      " 11px;'>月份</div>",
+      " 11px;'>Month</div>",
       unsafe_allow_html=True,
   )
   for idx, d_name in enumerate(week_days):
@@ -345,7 +334,7 @@ with col_calendar:
   last_month = None
   for w in range(10):
     week_start_d = st.session_state.start_week_date + timedelta(days=w * 7)
-    current_month = (week_start_d + timedelta(days=4)).month
+    current_month = (week_start_d + timedelta(days=4)).strftime("%b")
     row_cols = st.columns([0.6, 1, 1, 1, 1, 1, 1, 1])
 
     with row_cols[0]:
@@ -355,7 +344,7 @@ with col_calendar:
             f" column; align-items: center; justify-content: center; font-weight:"
             f" bold; color: #0284c7; background-color: #f0f9ff; border-left:"
             f" 3px solid #0284c7; border-radius: 4px; font-size: 12px; text-align:"
-            f" center;'>🌸<br>{current_month}月</div>",
+            f" center;'>🌸<br>{current_month}</div>",
             unsafe_allow_html=True,
         )
         last_month = current_month
@@ -372,7 +361,7 @@ with col_calendar:
       with row_cols[i + 1]:
         with st.container(border=True):
           if st.button(
-              f"{current_d.month}/{current_d.day}",
+              current_d.strftime("%b %d"),
               key=f"btn_date_{current_d.isoformat()}",
               use_container_width=True,
           ):
@@ -404,10 +393,10 @@ with col_calendar:
 # 右側：設定與活動庫區
 # ==========================================
 with col_setting:
-  st.header("⚙️ 設定與排程")
+  st.header("⚙️ Settings")
 
-  st.subheader("📌 選擇日期")
-  new_sel_date = st.date_input("選擇目標日期", value=st.session_state.sel_date)
+  st.subheader("📌 Select Date")
+  new_sel_date = st.date_input("Target Date", value=st.session_state.sel_date)
   if new_sel_date != st.session_state.sel_date:
     st.session_state.sel_date = new_sel_date
     st.rerun()
@@ -415,17 +404,17 @@ with col_setting:
   st.divider()
 
   c_lib_title, c_lib_setting = st.columns([3, 1])
-  c_lib_title.subheader("📚 活動庫 (點選安排)")
+  c_lib_title.subheader("📚 Activities")
 
   if "edit_act_mode" not in st.session_state:
     st.session_state.edit_act_mode = False
 
-  if c_lib_setting.button("⚙️ 設定", use_container_width=True):
+  if c_lib_setting.button("⚙️ Edit", use_container_width=True):
     st.session_state.edit_act_mode = not st.session_state.edit_act_mode
     st.rerun()
 
   if not activities:
-    st.write("暫時未有活動，請在下方新增。")
+    st.write("No activities yet. Add below.")
   else:
     act_items = list(activities.items())
     for i in range(0, len(act_items), 3):
@@ -469,14 +458,14 @@ with col_setting:
     chosen_info = activities[st.session_state.selected_act_id]
     emoji = color_emojis.get(chosen_info["color"], "📌")
     st.markdown(
-        f"**已選擇：** {emoji} <span style='color: #0284c7; font-weight:"
+        f"**Selected:** {emoji} <span style='color: #0284c7; font-weight:"
         f" bold;'>{chosen_info['name']} ({chosen_info['time']})</span>",
         unsafe_allow_html=True,
     )
 
     st.write("")
     c_btn1, c_btn2, c_btn3 = st.columns(3)
-    if c_btn1.button("📅 單次", use_container_width=True):
+    if c_btn1.button("📅 Single", use_container_width=True):
       item_id = str(uuid.uuid4())[:8]
       add_schedule_db(
           item_id,
@@ -486,10 +475,10 @@ with col_setting:
           chosen_info["time"],
           chosen_info["color"],
       )
-      st.success("成功安排！")
+      st.success("Scheduled!")
       st.rerun()
 
-    if c_btn2.button("🔄 4週", use_container_width=True):
+    if c_btn2.button("🔄 4 Wks", use_container_width=True):
       for i in range(4):
         target_date = st.session_state.sel_date + timedelta(weeks=i)
         item_id = str(uuid.uuid4())[:8]
@@ -501,10 +490,10 @@ with col_setting:
             chosen_info["time"],
             chosen_info["color"],
         )
-      st.success("成功新增4週！")
+      st.success("Added 4 weeks!")
       st.rerun()
 
-    if c_btn3.button("🚀 8週", use_container_width=True):
+    if c_btn3.button("🚀 8 Wks", use_container_width=True):
       for i in range(8):
         target_date = st.session_state.sel_date + timedelta(weeks=i)
         item_id = str(uuid.uuid4())[:8]
@@ -516,21 +505,19 @@ with col_setting:
             chosen_info["time"],
             chosen_info["color"],
         )
-      st.success("成功新增8週！")
+      st.success("Added 8 weeks!")
       st.rerun()
 
   st.divider()
 
-  st.subheader("＋ 新增活動種類")
-  act_name = st.text_input("活動名稱 (例如: 芭蕾舞)")
-  act_time = st.text_input("時間 (例如: 16:00)")
-  act_color = st.selectbox(
-      "選擇標籤顏色", ["粉紅", "藍色", "紫色", "綠色", "黃色"]
-  )
-  if st.button("確認新增活動", use_container_width=True):
+  st.subheader("＋ Add New Activity")
+  act_name = st.text_input("Activity Name (e.g., Ballet)")
+  act_time = st.text_input("Time (e.g., 16:00)")
+  act_color = st.selectbox("Color Tag", ["Pink", "Blue", "Purple", "Green", "Yellow"])
+  if st.button("Confirm & Add", use_container_width=True):
     if act_name:
       new_id = str(uuid.uuid4())[:8]
       add_activity_db(new_id, act_name, act_time, act_color)
       st.session_state.selected_act_id = new_id
-      st.success(f"已新增: {act_name}")
+      st.success(f"Added: {act_name}")
       st.rerun()
