@@ -5,10 +5,9 @@ import uuid
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 import streamlit as st
 from sqlalchemy import text
 
@@ -153,40 +152,59 @@ def delete_schedule_db(item_id):
 # --- PDF 生成核心函數 ---
 def generate_pdf_schedule(start_date, schedule_data):
   buffer = io.BytesIO()
-  # 使用橫向 A4 尺寸
   doc = SimpleDocTemplate(
       buffer,
       pagesize=landscape(A4),
-      rightMargin=30,
-      leftMargin=30,
-      topMargin=30,
-      bottomMargin=30,
+      rightMargin=20,
+      leftMargin=20,
+      topMargin=20,
+      bottomMargin=20,
   )
   elements = []
 
-  # 註冊中文字型 (使用內置或雲端通用思源黑體防亂碼，如無則用標準 Helvetica 但中文會變方格，因此需處理)
-  # 由於雲端環境簡化，我們用系統內建或者 fallback 寫法，如需完美中文，建議用系統字體
-  try:
-    # 嘗試註冊香港常用嘅中文字體 (如 NotoSansCJK 或系統現有字型)
-    pdfmetrics.registerFont(
-        TTFont("CJKFont", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc")
-    )
-    font_name = "CJKFont"
-  except:
-    font_name = "Helvetica"  # 如果搵唔到就用英文/預設 (避免Crash)
+  # 註冊中文字型 (支援 Linux 雲端環境)
+  font_name = "Helvetica"
+  for font_path in [
+      "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  ]:
+    try:
+      pdfmetrics.registerFont(TTFont("CustomCJK", font_path))
+      font_name = "CustomCJK"
+      break
+    except:
+      continue
 
   styles = getSampleStyleSheet()
   title_style = ParagraphStyle(
       "TitleStyle",
       parent=styles["Heading1"],
       fontName=font_name,
-      fontSize=18,
+      fontSize=16,
       textColor=colors.HexColor("#0284c7"),
-      alignment=1,  # 置中
-      spaceAfter=15,
+      alignment=1,
+      spaceAfter=10,
   )
 
-  # 標題
+  cell_style = ParagraphStyle(
+      "CellStyle",
+      parent=styles["Normal"],
+      fontName=font_name,
+      fontSize=8,
+      leading=10,
+      textColor=colors.HexColor("#334155"),
+  )
+
+  header_style = ParagraphStyle(
+      "HeaderStyle",
+      parent=styles["Normal"],
+      fontName=font_name,
+      fontSize=9,
+      leading=11,
+      alignment=1,
+      textColor=colors.HexColor("#334155"),
+  )
+
   end_date = start_date + timedelta(days=(8 * 7) - 1)
   elements.append(
       Paragraph(
@@ -196,28 +214,30 @@ def generate_pdf_schedule(start_date, schedule_data):
       )
   )
 
-  # 表格欄位名稱
-  table_data = [["月份", "日", "一", "二", "三", "四", "五", "六"]]
+  # 表格標題列
+  week_days = ["月份", "日", "一", "二", "三", "四", "五", "六"]
+  header_row = [Paragraph(f"<b>{d}</b>", header_style) for d in week_days]
+  table_data = [header_row]
 
-  week_days = ["日", "一", "二", "三", "四", "五", "六"]
-
-  # 產生 8 個星期嘅資料
+  # 產生 8 個星期嘅資料，並全部以 Paragraph 包裝以正確解析 HTML 標籤
   for w in range(8):
     week_start = start_date + timedelta(days=w * 7)
-    month_str = f"{week_start.month}月"
-    row = [month_str]
+    month_str = f"<b>{week_start.month}月</b>"
+    row = [Paragraph(month_str, header_style)]
+
     for i in range(7):
       curr_d = week_start + timedelta(days=i)
       day_events = schedule_data.get(curr_d, [])
-      cell_text = f"<b>{curr_d.month}/{curr_d.day}</b><br/>"
+
+      cell_content = f"<b>{curr_d.month}/{curr_d.day}</b><br/>"
       if day_events:
         for ev in day_events:
-          cell_text += f"<font size=8 color='#334155'>• {ev['name']} ({ev['time']})</font><br/>"
-      row.append(cell_text)
+          cell_content += f"• {ev['name']} ({ev['time']})<br/>"
+
+      row.append(Paragraph(cell_content, cell_style))
     table_data.append(row)
 
-  # 設定表格闊度 (總寬約 780 pt)
-  col_widths = [55, 103, 103, 103, 103, 103, 103, 103]
+  col_widths = [45, 105, 105, 105, 105, 105, 105, 105]
   t = Table(table_data, colWidths=col_widths)
   t.setStyle(
       TableStyle([
@@ -226,14 +246,12 @@ def generate_pdf_schedule(start_date, schedule_data):
               (0, 0),
               (-1, 0),
               colors.HexColor("#f1f5f9"),
-          ),  # 表頭背景
+          ),
           ("ALIGN", (0, 0), (-1, -1), "CENTER"),
           ("VALIGN", (0, 0), (-1, -1), "TOP"),
-          ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),  # 格線
-          ("FONTNAME", (0, 0), (-1, -1), font_name),
-          ("FONTSIZE", (0, 0), (-1, -1), 9),
-          ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-          ("TOPPADDING", (0, 0), (-1, -1), 8),
+          ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+          ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+          ("TOPPADDING", (0, 0), (-1, -1), 6),
       ])
   )
 
